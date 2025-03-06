@@ -12,7 +12,7 @@ declare module 'next-auth' {
   }
 }
 
-export const authOptions: NextAuthOptions = {
+const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       name: 'Password',
@@ -46,4 +46,6 @@ export const authOptions: NextAuthOptions = {
     signIn: '/',
     error: '/',
   },
-}; 
+};
+
+export default authOptions; 
