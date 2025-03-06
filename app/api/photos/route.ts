@@ -2,12 +2,12 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
 import cloudinary from '@/lib/cloudinary';
+import { UploadApiResponse, UploadApiErrorResponse, UploadResponseCallback } from 'cloudinary/types';
 import connectDB from '@/lib/mongodb';
 import Photo from '@/models/Photo';
 import Comment from '@/models/Comment';
 
-interface CloudinaryResult {
-  secure_url: string;
+type CloudinaryResult = UploadApiResponse & {
   image_metadata?: {
     GPSLatitude: string;
     GPSLongitude: string;
@@ -15,7 +15,7 @@ interface CloudinaryResult {
     GPSLongitudeRef: string;
     DateTimeOriginal: string;
   };
-}
+};
 
 interface CloudinaryError {
   message: string;
@@ -204,22 +204,20 @@ export async function POST(request: Request) {
         {
           folder: 'jackie-blog',
           resource_type: 'auto',
-          image_metadata: true, // Extract image metadata including GPS
-          colors: false, // Disable unnecessary features
+          image_metadata: true,
+          colors: false,
           faces: false,
           quality_analysis: false,
         },
-        (error: CloudinaryError | null, result?: CloudinaryResult) => {
-          if (error) {
-            console.error('Cloudinary upload error:', error);
-            reject(error);
-          } else if (result) {
-            console.log('Cloudinary upload result:', JSON.stringify(result, null, 2));
-            resolve(result);
+        ((err: UploadApiErrorResponse | undefined, result?: UploadApiResponse) => {
+          if (err || !result) {
+            console.error('Cloudinary upload error:', err);
+            reject(err || new Error('No result from Cloudinary'));
           } else {
-            reject(new Error('No result from Cloudinary'));
+            console.log('Cloudinary upload result:', JSON.stringify(result, null, 2));
+            resolve(result as CloudinaryResult);
           }
-        }
+        }) as UploadResponseCallback
       );
 
       // Write the buffer to the upload stream
