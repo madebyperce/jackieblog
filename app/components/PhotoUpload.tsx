@@ -66,16 +66,27 @@ export default function PhotoUpload() {
       });
 
       let responseData;
+      let responseText;
       try {
-        const textResponse = await response.text();
+        responseText = await response.text();
         try {
-          responseData = JSON.parse(textResponse);
+          responseData = JSON.parse(responseText);
         } catch (parseError) {
-          console.error('Failed to parse response as JSON:', textResponse);
+          console.error('Failed to parse response as JSON:', {
+            status: response.status,
+            statusText: response.statusText,
+            text: responseText
+          });
           throw new Error('Server returned an invalid response format');
         }
       } catch (parseError: any) {
-        console.error('Error handling response:', parseError);
+        console.error('Error handling response:', {
+          error: parseError,
+          message: parseError.message,
+          responseStatus: response.status,
+          responseStatusText: response.statusText,
+          responseText: responseText
+        });
         throw new Error(`Server error: ${parseError.message}`);
       }
 
@@ -107,6 +118,10 @@ export default function PhotoUpload() {
           }
           if (responseData.name === 'Error' && responseData.http_code) {
             errorDetails += ` (Status: ${responseData.http_code})`;
+          }
+          // Add special handling for configuration errors
+          if (errorMessage === 'Server configuration error') {
+            errorDetails = 'The server is not properly configured. Please contact the administrator.';
           }
         }
         
