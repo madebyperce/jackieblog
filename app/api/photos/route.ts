@@ -326,6 +326,11 @@ export async function POST(request: Request) {
         metadata: photoData.metadata
       });
 
+      if (photoData.metadata && typeof photoData.metadata.longitude === 'number' && photoData.metadata.longitude > 0) {
+        console.log(`Transforming positive longitude ${photoData.metadata.longitude} to negative during upload`);
+        photoData.metadata.longitude = -photoData.metadata.longitude;
+      }
+
       photo = await Photo.create(photoData);
       console.log('Photo document created:', { id: photo._id });
     } catch (saveError: any) {

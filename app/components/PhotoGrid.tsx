@@ -7,6 +7,7 @@ import Map from './Map';
 import { MapPinIcon } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
 import CommentSection from './CommentSection';
+import Pagination from './Pagination';
 
 interface Photo {
   _id: string;
@@ -185,6 +186,36 @@ export default function PhotoGrid() {
   const currentPhotos = photos.slice(indexOfFirstPhoto, indexOfLastPhoto);
   const totalPages = Math.ceil(photos.length / photosPerPage);
 
+  useEffect(() => {
+    console.log('View mode changed:', view);
+  }, [view]);
+
+  // Add this function to handle page changes with scrolling
+  const handlePageChange = (pageNumber: number) => {
+    // Update the current page
+    setCurrentPage(pageNumber);
+    
+    // Scroll to the top of the page
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+    
+    // Additional fallbacks for better browser compatibility
+    setTimeout(() => {
+      // Standard scroll methods
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0; // For Safari
+      
+      // Try to scroll the container if it exists
+      const container = document.querySelector('.container');
+      if (container) {
+        container.scrollTop = 0;
+      }
+    }, 100);
+  };
+
   if (isLoading) {
     return <div className="text-center">Loading photos...</div>;
   }
@@ -276,21 +307,13 @@ export default function PhotoGrid() {
         </div>
       )}
       
-      {totalPages > 1 && (
-        <div className="flex justify-center gap-2 mt-8 max-w-[500px] mx-auto">
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-            <button
-              key={page}
-              onClick={() => setCurrentPage(page)}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
-                currentPage === page
-                  ? 'bg-gray-800 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {page}
-            </button>
-          ))}
+      {view !== 'thumbnails' && totalPages > 1 && (
+        <div className="pagination-container mt-16">
+          <Pagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+          />
         </div>
       )}
     </div>

@@ -4,6 +4,7 @@ import authOptions from '@/lib/auth';
 import connectDB from '@/lib/mongodb';
 import Photo from '@/models/Photo';
 import cloudinary from '@/lib/cloudinary';
+import { transformCoordinates } from '@/lib/transformCoordinates';
 
 export async function DELETE(
   request: Request,
@@ -61,23 +62,34 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { description, location } = body;
+    const { description, location, metadata } = body;
 
     await connectDB();
+
+    // Get the existing photo
+    const existingPhoto = await Photo.findById(params.id);
+    if (!existingPhoto) {
+      return NextResponse.json({ error: 'Photo not found' }, { status: 404 });
+    }
+
+    // Prepare update object
+    const updateData: any = {};
+    if (description !== undefined) updateData.description = description;
+    if (location !== undefined) updateData.location = location;
+    
+    // Handle metadata updates
+    if (metadata) {
+      // Transform coordinates if present
+      const transformedMetadata = transformCoordinates(metadata);
+      updateData.metadata = transformedMetadata;
+    }
 
     // Update the photo
     const photo = await Photo.findByIdAndUpdate(
       params.id,
-      { 
-        ...(description && { description }),
-        ...(location && { location })
-      },
+      updateData,
       { new: true }
     );
-
-    if (!photo) {
-      return NextResponse.json({ error: 'Photo not found' }, { status: 404 });
-    }
 
     return NextResponse.json(photo);
   } catch (error) {
