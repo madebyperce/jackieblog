@@ -10,7 +10,7 @@ const workSans = Work_Sans({
 });
 
 export const metadata = {
-  title: "Jackie's Adventures",
+  title: "Jackie's Blog",
   description: 'A personal blog showcasing photos and stories',
 };
 
