@@ -67,10 +67,16 @@ export default function PhotoUpload() {
 
       let responseData;
       try {
-        responseData = await response.json();
-      } catch (parseError) {
-        console.error('Error parsing response:', parseError);
-        throw new Error('Server returned an invalid response');
+        const textResponse = await response.text();
+        try {
+          responseData = JSON.parse(textResponse);
+        } catch (parseError) {
+          console.error('Failed to parse response as JSON:', textResponse);
+          throw new Error('Server returned an invalid response format');
+        }
+      } catch (parseError: any) {
+        console.error('Error handling response:', parseError);
+        throw new Error(`Server error: ${parseError.message}`);
       }
 
       if (response.ok) {
@@ -86,12 +92,28 @@ export default function PhotoUpload() {
           status: response.status,
           statusText: response.statusText,
           error: responseData.error,
-          details: responseData.details
+          details: responseData.details,
+          name: responseData.name,
+          http_code: responseData.http_code
         });
+        
+        let errorMessage = 'Failed to upload photo';
+        let errorDetails = '';
+        
+        if (responseData.error) {
+          errorMessage = responseData.error;
+          if (responseData.details) {
+            errorDetails = responseData.details;
+          }
+          if (responseData.name === 'Error' && responseData.http_code) {
+            errorDetails += ` (Status: ${responseData.http_code})`;
+          }
+        }
+        
         setUploadStatus({
           type: 'error',
-          message: responseData.error || 'Failed to upload photo',
-          details: responseData.details || responseData.message
+          message: errorMessage,
+          details: errorDetails
         });
       }
     } catch (error: any) {

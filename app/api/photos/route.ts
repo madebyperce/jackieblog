@@ -172,24 +172,45 @@ export async function POST(request: Request) {
     try {
       console.log('Starting Cloudinary upload...');
       result = await new Promise<CloudinaryResult>((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-          {
-            folder: 'jackie-blog',
-            resource_type: 'auto',
-            image_metadata: true,
-          },
-          ((err: UploadApiErrorResponse | undefined, result?: UploadApiResponse) => {
-            if (err) {
-              console.error('Cloudinary upload error:', {
-                error: err,
-                message: err.message,
-                http_code: err.http_code
-              });
-              reject(err);
-            } else if (!result) {
-              console.error('No result from Cloudinary');
-              reject(new Error('No result from Cloudinary'));
-            } else {
+        let uploadStream;
+        let readableStream;
+        
+        try {
+          // Create readable stream first
+          const Readable = require('stream').Readable;
+          readableStream = new Readable();
+          readableStream.push(buffer);
+          readableStream.push(null);
+
+          // Set up error handlers for readable stream
+          readableStream.on('error', (streamError: any) => {
+            console.error('Readable stream error:', streamError);
+            reject(new Error(`Stream error: ${streamError.message}`));
+          });
+
+          // Create upload stream
+          uploadStream = cloudinary.uploader.upload_stream(
+            {
+              folder: 'jackie-blog',
+              resource_type: 'auto',
+              image_metadata: true,
+            },
+            (err: UploadApiErrorResponse | undefined, result?: UploadApiResponse) => {
+              if (err) {
+                console.error('Cloudinary upload error:', {
+                  error: err,
+                  message: err.message,
+                  http_code: err.http_code,
+                  name: err.name
+                });
+                reject(err);
+                return;
+              }
+              if (!result) {
+                console.error('No result from Cloudinary');
+                reject(new Error('No result from Cloudinary'));
+                return;
+              }
               console.log('Cloudinary upload successful:', {
                 publicId: result.public_id,
                 url: result.secure_url,
@@ -197,26 +218,36 @@ export async function POST(request: Request) {
               });
               resolve(result as CloudinaryResult);
             }
-          }) as UploadResponseCallback
-        );
+          );
 
-        // Write the buffer to the upload stream
-        try {
-          const Readable = require('stream').Readable;
-          const readableStream = new Readable();
-          readableStream.push(buffer);
-          readableStream.push(null);
+          // Set up error handler for upload stream
+          uploadStream.on('error', (uploadError: any) => {
+            console.error('Upload stream error:', uploadError);
+            reject(new Error(`Upload stream error: ${uploadError.message}`));
+          });
+
+          // Pipe the streams
           readableStream.pipe(uploadStream);
-        } catch (streamError: any) {
-          console.error('Error creating upload stream:', streamError);
-          reject(new Error(`Failed to create upload stream: ${streamError.message}`));
+
+        } catch (setupError: any) {
+          console.error('Error setting up streams:', setupError);
+          // Clean up streams if they were created
+          if (readableStream) {
+            readableStream.destroy();
+          }
+          if (uploadStream) {
+            uploadStream.destroy();
+          }
+          reject(new Error(`Failed to setup upload: ${setupError.message}`));
         }
       });
     } catch (uploadError: any) {
       console.error('Cloudinary upload failed:', uploadError);
       return NextResponse.json({ 
         error: 'Failed to upload to Cloudinary',
-        details: uploadError.message 
+        details: uploadError.message,
+        name: uploadError.name,
+        http_code: uploadError.http_code
       }, { status: 500 });
     }
 
