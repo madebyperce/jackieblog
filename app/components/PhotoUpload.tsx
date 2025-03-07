@@ -14,6 +14,7 @@ interface UploadForm {
 interface UploadStatus {
   type: 'success' | 'error' | null;
   message: string;
+  details?: string;
 }
 
 export default function PhotoUpload() {
@@ -35,10 +36,29 @@ export default function PhotoUpload() {
     setUploadStatus({ type: null, message: '' });
 
     try {
+      // Validate file type and size
+      const file = data.image[0];
+      const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
+      if (!validTypes.includes(file.type)) {
+        throw new Error(`Invalid file type. Supported types are: ${validTypes.join(', ')}`);
+      }
+
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      if (file.size > maxSize) {
+        throw new Error('File size too large. Maximum size is 10MB');
+      }
+
       const formData = new FormData();
-      formData.append('image', data.image[0]);
+      formData.append('image', file);
       formData.append('description', data.description);
       formData.append('location', data.location);
+
+      console.log('Uploading file:', {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        lastModified: new Date(file.lastModified).toISOString()
+      });
 
       const response = await fetch('/api/photos', {
         method: 'POST',
@@ -48,6 +68,7 @@ export default function PhotoUpload() {
       const responseData = await response.json();
 
       if (response.ok) {
+        console.log('Upload successful:', responseData);
         reset();
         setUploadStatus({
           type: 'success',
@@ -55,25 +76,29 @@ export default function PhotoUpload() {
         });
         router.refresh();
       } else {
+        console.error('Upload failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: responseData.error
+        });
         setUploadStatus({
           type: 'error',
-          message: responseData.error || 'Failed to upload photo'
+          message: 'Failed to upload photo',
+          details: responseData.error
         });
       }
-    } catch (error) {
-      console.error('Error uploading photo:', error);
+    } catch (error: any) {
+      console.error('Upload error:', {
+        message: error.message,
+        stack: error.stack
+      });
       setUploadStatus({
         type: 'error',
-        message: 'An error occurred while uploading the photo'
+        message: 'An error occurred while uploading the photo',
+        details: error.message
       });
     } finally {
       setIsUploading(false);
-      // Clear success message after 3 seconds
-      if (uploadStatus.type === 'success') {
-        setTimeout(() => {
-          setUploadStatus({ type: null, message: '' });
-        }, 3000);
-      }
     }
   };
 
@@ -134,7 +159,10 @@ export default function PhotoUpload() {
             uploadStatus.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
           }`}
         >
-          {uploadStatus.message}
+          <p className="font-medium">{uploadStatus.message}</p>
+          {uploadStatus.details && (
+            <p className="text-sm mt-1 opacity-80">{uploadStatus.details}</p>
+          )}
         </div>
       )}
     </div>
