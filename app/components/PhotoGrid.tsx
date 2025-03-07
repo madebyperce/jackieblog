@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import Map from './Map';
+import { MapPinIcon } from '@heroicons/react/24/outline';
+import { format } from 'date-fns';
+import CommentSection from './CommentSection';
 
 interface Photo {
   _id: string;
@@ -12,12 +15,18 @@ interface Photo {
   location: string;
   createdAt: string;
   capturedAt: string;
-  comments: Comment[];
   metadata?: {
     latitude?: number;
     longitude?: number;
     location?: string;
+    coordinates?: string;
   };
+  comments: Array<{
+    _id: string;
+    content: string;
+    authorName: string;
+    createdAt: string;
+  }>;
 }
 
 interface Comment {
@@ -65,10 +74,40 @@ export default function PhotoGrid() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
+  const [view, setView] = useState<'grid' | 'thumbnails'>('grid');
   const [expandedComments, setExpandedComments] = useState<{ [key: string]: boolean }>({});
   const [currentPage, setCurrentPage] = useState(1);
   const photosPerPage = 10;
   const { register, handleSubmit, reset } = useForm<CommentForm>();
+
+  // Preload thumbnails
+  useEffect(() => {
+    photos.forEach(photo => {
+      const img = new window.Image();
+      img.src = photo.imageUrl;
+    });
+  }, [photos]);
+
+  // Function to find the page number for a specific photo
+  const findPhotoPage = (photoId: string) => {
+    const photoIndex = photos.findIndex(p => p._id === photoId);
+    if (photoIndex === -1) return 1;
+    return Math.floor(photoIndex / photosPerPage) + 1;
+  };
+
+  // Handle thumbnail click
+  const handleThumbnailClick = (photoId: string) => {
+    const targetPage = findPhotoPage(photoId);
+    setCurrentPage(targetPage);
+    setView('grid');
+    // Scroll to the clicked photo after a short delay to allow view transition
+    setTimeout(() => {
+      const photoElement = document.getElementById(`photo-${photoId}`);
+      if (photoElement) {
+        photoElement.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
+  };
 
   useEffect(() => {
     fetchPhotos();
@@ -159,93 +198,90 @@ export default function PhotoGrid() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-8">
-        {currentPhotos.map((photo) => (
-          <div key={photo._id} className="bg-white rounded-lg shadow-sm overflow-hidden max-w-[500px] mx-auto">
-            <div className="relative w-full">
+    <div className="container mx-auto px-4 pt-2 pb-8">
+      <div className="flex justify-center mb-8">
+        <button
+          onClick={() => setView(view === 'grid' ? 'thumbnails' : 'grid')}
+          className="text-[11px] text-gray-400 px-3 py-1.5 rounded italic hover:text-gray-600 transition-colors duration-200"
+        >
+          {view === 'grid' ? 'show thumbnails' : 'show full size'}
+        </button>
+      </div>
+
+      {view === 'thumbnails' ? (
+        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
+          {photos.map((photo) => (
+            <div
+              key={photo._id}
+              className="relative w-[100px] h-[100px] cursor-pointer hover:opacity-90 transition-opacity duration-200"
+              onClick={() => handleThumbnailClick(photo._id)}
+            >
               <Image
                 src={photo.imageUrl}
                 alt={photo.description}
-                width={500}
-                height={500}
-                className="w-full"
-                style={{ height: 'auto' }}
+                fill
+                className="object-cover rounded"
+                sizes="100px"
+                priority={true}
               />
             </div>
-            
-            <div className="p-3">
-              <div className="space-y-1.5">
-                <p className="text-[15px] leading-snug text-gray-900 font-medium">{photo.description}</p>
-                <div className="flex items-center text-xs text-gray-500 gap-2">
-                  <span className="font-medium">{formatDate(photo.capturedAt)}</span>
-                  <span className="text-gray-300">•</span>
-                  <span className="flex items-center gap-1">
-                    <span className="truncate">{photo.location}</span>
-                    {photo.metadata?.latitude && photo.metadata?.longitude && (
-                      <Map 
-                        location={photo.location} 
-                        latitude={photo.metadata?.latitude} 
-                        longitude={photo.metadata?.longitude}
-                      />
-                    )}
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-8 max-w-[500px] mx-auto">
+          {currentPhotos.map((photo) => (
+            <div 
+              key={photo._id} 
+              id={`photo-${photo._id}`}
+              className="border-2 border-gray-300 rounded-lg overflow-hidden bg-white shadow-lg scroll-mt-8"
+            >
+              <div className="relative w-[500px]">
+                <Image
+                  src={photo.imageUrl}
+                  alt={photo.description}
+                  width={500}
+                  height={375}
+                  className="w-full"
+                  priority={currentPage === 1}
+                />
+              </div>
+              <div className="p-4">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="font-medium text-gray-800">{photo.description}</span>
+                  <span className="text-gray-400">•</span>
+                  <span className="text-gray-600">{photo.location}</span>
+                  {photo.metadata?.coordinates && (
+                    <>
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${photo.metadata.coordinates}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Open map"
+                        className="inline-block transform transition-all duration-200 hover:scale-125 hover:rotate-12 text-gray-500"
+                      >
+                        🗺️
+                      </a>
+                      <span className="text-gray-400">•</span>
+                    </>
+                  )}
+                  <span className="text-gray-500 font-light">
+                    {format(new Date(photo.capturedAt), 'MMM d, yyyy')}
                   </span>
                 </div>
-              </div>
-              
-              <div className="mt-3 border-t border-gray-100 pt-2">
-                <button
-                  onClick={() => toggleComments(photo._id)}
-                  className="text-xs font-medium text-gray-600 hover:text-gray-900 transition-colors"
-                >
-                  {photo.comments?.length ? `Comments (${photo.comments.length})` : 'Add comment'}
-                </button>
-                
-                {expandedComments[photo._id] && (
-                  <div className="mt-2 space-y-2">
-                    {photo.comments?.map((comment) => (
-                      <div key={comment._id} className="bg-gray-50 p-2 rounded text-sm">
-                        <p className="text-xs text-gray-700 leading-relaxed">{comment.content}</p>
-                        <p className="text-[10px] text-gray-400 mt-1 font-medium">
-                          {comment.authorName || 'Anonymous'} • {formatDate(comment.createdAt)}
-                        </p>
-                      </div>
-                    ))}
-                    
-                    <form onSubmit={handleSubmit((data) => onSubmitComment(photo._id, data))} className="mt-3 space-y-2">
-                      <input
-                        {...register('authorName', { required: false })}
-                        placeholder="Your name (optional)"
-                        className="w-full px-2 py-1.5 text-xs border rounded focus:ring-1 focus:ring-blue-400 focus:border-blue-400"
-                      />
-                      <textarea
-                        {...register('content', { required: true })}
-                        placeholder="Add a comment..."
-                        className="w-full px-2 py-1.5 text-xs border rounded focus:ring-1 focus:ring-blue-400 focus:border-blue-400"
-                        rows={2}
-                      />
-                      <button
-                        type="submit"
-                        className="w-full bg-gray-100 text-gray-700 py-1.5 px-3 rounded text-xs font-medium hover:bg-gray-200 transition"
-                      >
-                        Post Comment
-                      </button>
-                    </form>
-                  </div>
-                )}
+                <CommentSection photo={photo} />
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
       
       {totalPages > 1 && (
-        <div className="flex justify-center gap-1.5 mt-6">
+        <div className="flex justify-center gap-2 mt-8 max-w-[500px] mx-auto">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
             <button
               key={page}
               onClick={() => setCurrentPage(page)}
-              className={`px-3 py-1.5 rounded text-xs font-medium ${
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
                 currentPage === page
                   ? 'bg-gray-800 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'

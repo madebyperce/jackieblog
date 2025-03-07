@@ -8,25 +8,44 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    const body = await request.json();
+    const { content, authorName } = body;
+
+    if (!content) {
+      return NextResponse.json(
+        { error: 'Content is required' },
+        { status: 400 }
+      );
+    }
+
     await connectDB();
-    const photoId = params.id;
-    const data = await request.json();
 
     // Create the comment
     const comment = await Comment.create({
-      ...data,
-      photoId,
-      createdAt: new Date()
+      content,
+      authorName: authorName || 'Anonymous',
+      createdAt: new Date(),
+      photoId: params.id
     });
 
     // Add the comment to the photo's comments array
-    await Photo.findByIdAndUpdate(photoId, {
-      $push: { comments: comment._id },
-    });
+    const photo = await Photo.findByIdAndUpdate(
+      params.id,
+      { $push: { comments: comment._id } },
+      { new: true }
+    ).populate('comments');
+
+    if (!photo) {
+      await Comment.findByIdAndDelete(comment._id);
+      return NextResponse.json({ error: 'Photo not found' }, { status: 404 });
+    }
 
     return NextResponse.json(comment);
   } catch (error) {
     console.error('Error creating comment:', error);
-    return NextResponse.json({ error: 'Error creating comment' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Error creating comment' },
+      { status: 500 }
+    );
   }
 } 

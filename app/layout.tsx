@@ -14,7 +14,7 @@ export const metadata = {
   description: 'A personal blog showcasing photos and stories',
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -24,7 +24,9 @@ export default async function RootLayout({
       <body className={`${inter.className} ${workSans.variable}`}>
         <NextAuthProvider>
           <SitePassword>
-            {children}
+            <div className="min-h-screen bg-gray-50">
+              <main>{children}</main>
+            </div>
           </SitePassword>
         </NextAuthProvider>
       </body>

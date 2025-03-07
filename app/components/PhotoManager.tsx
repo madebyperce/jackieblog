@@ -2,6 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+import { format } from 'date-fns';
+
+interface Comment {
+  _id: string;
+  content: string;
+  authorName: string;
+  createdAt: string;
+}
 
 interface Photo {
   _id: string;
@@ -9,7 +18,8 @@ interface Photo {
   description: string;
   location: string;
   createdAt: string;
-  capturedAt?: string;
+  capturedAt: string;
+  comments: Comment[];
 }
 
 export default function PhotoManager() {
@@ -17,6 +27,10 @@ export default function PhotoManager() {
   const [loading, setLoading] = useState(true);
   const [deleteStatus, setDeleteStatus] = useState<{ [key: string]: string }>({});
   const [editingPhoto, setEditingPhoto] = useState<string | null>(null);
+  const [editingComment, setEditingComment] = useState<string | null>(null);
+  const [editDescription, setEditDescription] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+  const [editCommentContent, setEditCommentContent] = useState('');
   const router = useRouter();
 
   useEffect(() => {
@@ -35,63 +49,135 @@ export default function PhotoManager() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this photo?')) {
-      return;
-    }
+  const handleDelete = async (photoId: string) => {
+    if (!confirm('Are you sure you want to delete this photo?')) return;
 
-    setDeleteStatus(prev => ({ ...prev, [id]: 'Deleting...' }));
+    setDeleteStatus(prev => ({ ...prev, [photoId]: 'Deleting...' }));
     
     try {
-      const response = await fetch(`/api/photos/${id}`, {
+      const response = await fetch(`/api/photos/${photoId}`, {
         method: 'DELETE',
       });
 
-      if (!response.ok) {
+      if (response.ok) {
+        setPhotos(photos.filter(photo => photo._id !== photoId));
+        router.refresh();
+        setDeleteStatus(prev => ({ ...prev, [photoId]: 'Deleted!' }));
+      } else {
         throw new Error('Failed to delete photo');
       }
-
-      setDeleteStatus(prev => ({ ...prev, [id]: 'Deleted!' }));
-      setPhotos(prev => prev.filter(photo => photo._id !== id));
-      router.refresh();
       
       // Clear the status after 2 seconds
       setTimeout(() => {
         setDeleteStatus(prev => {
           const newStatus = { ...prev };
-          delete newStatus[id];
+          delete newStatus[photoId];
           return newStatus;
         });
       }, 2000);
     } catch (error) {
       console.error('Error deleting photo:', error);
-      setDeleteStatus(prev => ({ ...prev, [id]: 'Error!' }));
+      setDeleteStatus(prev => ({ ...prev, [photoId]: 'Error!' }));
     }
   };
 
-  const handleUpdate = async (id: string, data: { description?: string; location?: string }) => {
+  const handleUpdate = async (photoId: string) => {
     try {
-      const response = await fetch(`/api/photos/${id}`, {
+      const response = await fetch(`/api/photos/${photoId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          description: editDescription,
+          location: editLocation,
+        }),
       });
 
-      if (!response.ok) {
+      if (response.ok) {
+        const updatedPhotos = photos.map(photo => {
+          if (photo._id === photoId) {
+            return { ...photo, description: editDescription, location: editLocation };
+          }
+          return photo;
+        });
+        setPhotos(updatedPhotos);
+        setEditingPhoto(null);
+        router.refresh();
+      } else {
         throw new Error('Failed to update photo');
       }
-
-      const updatedPhoto = await response.json();
-      setPhotos(prev => prev.map(photo => 
-        photo._id === id ? { ...photo, ...updatedPhoto } : photo
-      ));
-      setEditingPhoto(null);
-      router.refresh();
     } catch (error) {
       console.error('Error updating photo:', error);
       alert('Failed to update photo');
+    }
+  };
+
+  const handleDeleteComment = async (photoId: string, commentId: string) => {
+    if (!confirm('Are you sure you want to delete this comment?')) return;
+
+    try {
+      const response = await fetch(`/api/photos/${photoId}/comments/${commentId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        const updatedPhotos = photos.map(photo => {
+          if (photo._id === photoId) {
+            return {
+              ...photo,
+              comments: photo.comments.filter(comment => comment._id !== commentId)
+            };
+          }
+          return photo;
+        });
+        setPhotos(updatedPhotos);
+        router.refresh();
+      } else {
+        throw new Error('Failed to delete comment');
+      }
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      alert('Failed to delete comment');
+    }
+  };
+
+  const handleUpdateComment = async (photoId: string, commentId: string) => {
+    try {
+      const response = await fetch(`/api/photos/${photoId}/comments/${commentId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: editCommentContent,
+        }),
+      });
+
+      if (response.ok) {
+        const updatedPhotos = photos.map(photo => {
+          if (photo._id === photoId) {
+            return {
+              ...photo,
+              comments: photo.comments.map(comment => {
+                if (comment._id === commentId) {
+                  return { ...comment, content: editCommentContent };
+                }
+                return comment;
+              })
+            };
+          }
+          return photo;
+        });
+        setPhotos(updatedPhotos);
+        setEditingComment(null);
+        router.refresh();
+      } else {
+        throw new Error('Failed to update comment');
+      }
+    } catch (error) {
+      console.error('Error updating comment:', error);
+      alert('Failed to update comment');
     }
   };
 
@@ -104,81 +190,72 @@ export default function PhotoManager() {
   }
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-bold">Manage Photos</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {photos.map((photo) => (
-          <div key={photo._id} className="border rounded-lg overflow-hidden bg-white shadow">
-            <img
-              src={photo.imageUrl}
-              alt={photo.description}
-              className="w-full h-48 object-cover"
-            />
-            <div className="p-4 space-y-3">
+    <div className="space-y-8">
+      <h2 className="text-xl font-bold mb-4">Manage Photos</h2>
+      {photos.map(photo => (
+        <div key={photo._id} className="border rounded-lg p-6 space-y-4 bg-white shadow">
+          <div className="flex items-start gap-6">
+            <div className="relative w-48 h-48 flex-shrink-0">
+              <Image
+                src={photo.imageUrl}
+                alt={photo.description}
+                fill
+                className="object-cover rounded"
+              />
+            </div>
+            <div className="flex-grow space-y-4">
               {editingPhoto === photo._id ? (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const formData = new FormData(e.currentTarget);
-                    handleUpdate(photo._id, {
-                      description: formData.get('description') as string,
-                      location: formData.get('location') as string,
-                    });
-                  }}
-                  className="space-y-3"
-                >
+                <>
                   <input
                     type="text"
-                    name="description"
-                    defaultValue={photo.description}
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
                     className="w-full p-2 border rounded"
                     placeholder="Description"
                   />
                   <input
                     type="text"
-                    name="location"
-                    defaultValue={photo.location}
+                    value={editLocation}
+                    onChange={(e) => setEditLocation(e.target.value)}
                     className="w-full p-2 border rounded"
                     placeholder="Location"
                   />
-                  <div className="flex gap-2">
+                  <div className="space-x-2">
                     <button
-                      type="submit"
-                      className="flex-1 bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                      onClick={() => handleUpdate(photo._id)}
+                      className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
                     >
                       Save
                     </button>
                     <button
-                      type="button"
                       onClick={() => setEditingPhoto(null)}
-                      className="flex-1 bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600"
+                      className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
                     >
                       Cancel
                     </button>
                   </div>
-                </form>
+                </>
               ) : (
                 <>
-                  <p className="font-medium">{photo.description}</p>
-                  <p className="text-sm text-gray-600">{photo.location}</p>
-                  <p className="text-sm text-gray-600">
-                    Created: {new Date(photo.createdAt).toLocaleString()}
+                  <p className="text-lg">{photo.description}</p>
+                  <p className="text-gray-600">{photo.location}</p>
+                  <p className="text-sm text-gray-500">
+                    Captured: {format(new Date(photo.capturedAt), 'PPP')}
                   </p>
-                  {photo.capturedAt && (
-                    <p className="text-sm text-gray-600">
-                      Captured: {new Date(photo.capturedAt).toLocaleString()}
-                    </p>
-                  )}
-                  <div className="flex gap-2">
+                  <div className="space-x-2">
                     <button
-                      onClick={() => setEditingPhoto(photo._id)}
-                      className="flex-1 bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                      onClick={() => {
+                        setEditingPhoto(photo._id);
+                        setEditDescription(photo.description);
+                        setEditLocation(photo.location);
+                      }}
+                      className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => handleDelete(photo._id)}
-                      className={`flex-1 px-3 py-1 rounded text-white ${
+                      className={`bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 ${
                         deleteStatus[photo._id]
                           ? deleteStatus[photo._id] === 'Deleted!'
                             ? 'bg-green-500'
@@ -196,8 +273,72 @@ export default function PhotoManager() {
               )}
             </div>
           </div>
-        ))}
-      </div>
+
+          {/* Comments section */}
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold mb-4">Comments ({photo.comments.length})</h3>
+            <div className="space-y-4">
+              {photo.comments.map(comment => (
+                <div key={comment._id} className="bg-gray-50 p-4 rounded">
+                  {editingComment === comment._id ? (
+                    <div className="space-y-2">
+                      <textarea
+                        value={editCommentContent}
+                        onChange={(e) => setEditCommentContent(e.target.value)}
+                        className="w-full p-2 border rounded"
+                        rows={3}
+                      />
+                      <div className="space-x-2">
+                        <button
+                          onClick={() => handleUpdateComment(photo._id, comment._id)}
+                          className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setEditingComment(null)}
+                          className="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-medium">{comment.authorName}</p>
+                          <p className="text-gray-600">{comment.content}</p>
+                          <p className="text-sm text-gray-500">
+                            {format(new Date(comment.createdAt), 'PPP')}
+                          </p>
+                        </div>
+                        <div className="space-x-2">
+                          <button
+                            onClick={() => {
+                              setEditingComment(comment._id);
+                              setEditCommentContent(comment.content);
+                            }}
+                            className="text-blue-500 hover:text-blue-600"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteComment(photo._id, comment._id)}
+                            className="text-red-500 hover:text-red-600"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 } 
