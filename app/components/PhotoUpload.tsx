@@ -65,7 +65,13 @@ export default function PhotoUpload() {
         body: formData,
       });
 
-      const responseData = await response.json();
+      let responseData;
+      try {
+        responseData = await response.json();
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+        throw new Error('Server returned an invalid response');
+      }
 
       if (response.ok) {
         console.log('Upload successful:', responseData);
@@ -79,12 +85,13 @@ export default function PhotoUpload() {
         console.error('Upload failed:', {
           status: response.status,
           statusText: response.statusText,
-          error: responseData.error
+          error: responseData.error,
+          details: responseData.details
         });
         setUploadStatus({
           type: 'error',
-          message: 'Failed to upload photo',
-          details: responseData.error
+          message: responseData.error || 'Failed to upload photo',
+          details: responseData.details || responseData.message
         });
       }
     } catch (error: any) {

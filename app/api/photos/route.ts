@@ -117,7 +117,17 @@ export async function POST(request: Request) {
     }
 
     // Then validate form data
-    const formData = await request.formData();
+    let formData;
+    try {
+      formData = await request.formData();
+    } catch (formError: any) {
+      console.error('Error parsing form data:', formError);
+      return NextResponse.json({ 
+        error: 'Failed to parse form data',
+        details: formError.message 
+      }, { status: 400 });
+    }
+
     const image = formData.get('image') as File;
     const description = formData.get('description') as string;
     const location = formData.get('location') as string;
@@ -143,133 +153,188 @@ export async function POST(request: Request) {
     }
 
     // Convert the file to a buffer
-    console.log('Converting file to buffer...');
-    const bytes = await image.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    console.log('Buffer created, size:', buffer.length);
+    let buffer;
+    try {
+      console.log('Converting file to buffer...');
+      const bytes = await image.arrayBuffer();
+      buffer = Buffer.from(bytes);
+      console.log('Buffer created, size:', buffer.length);
+    } catch (bufferError: any) {
+      console.error('Error creating buffer:', bufferError);
+      return NextResponse.json({ 
+        error: 'Failed to process image file',
+        details: bufferError.message 
+      }, { status: 500 });
+    }
 
     // Upload to Cloudinary with metadata extraction
-    console.log('Starting Cloudinary upload...');
-    const result = await new Promise<CloudinaryResult>((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        {
-          folder: 'jackie-blog',
-          resource_type: 'auto',
-          image_metadata: true,
-        },
-        ((err: UploadApiErrorResponse | undefined, result?: UploadApiResponse) => {
-          if (err) {
-            console.error('Cloudinary upload error:', {
-              error: err,
-              message: err.message,
-              http_code: err.http_code
-            });
-            reject(err);
-          } else if (!result) {
-            console.error('No result from Cloudinary');
-            reject(new Error('No result from Cloudinary'));
-          } else {
-            console.log('Cloudinary upload successful:', {
-              publicId: result.public_id,
-              url: result.secure_url,
-              hasMetadata: !!result.image_metadata
-            });
-            resolve(result as CloudinaryResult);
-          }
-        }) as UploadResponseCallback
-      );
+    let result;
+    try {
+      console.log('Starting Cloudinary upload...');
+      result = await new Promise<CloudinaryResult>((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            folder: 'jackie-blog',
+            resource_type: 'auto',
+            image_metadata: true,
+          },
+          ((err: UploadApiErrorResponse | undefined, result?: UploadApiResponse) => {
+            if (err) {
+              console.error('Cloudinary upload error:', {
+                error: err,
+                message: err.message,
+                http_code: err.http_code
+              });
+              reject(err);
+            } else if (!result) {
+              console.error('No result from Cloudinary');
+              reject(new Error('No result from Cloudinary'));
+            } else {
+              console.log('Cloudinary upload successful:', {
+                publicId: result.public_id,
+                url: result.secure_url,
+                hasMetadata: !!result.image_metadata
+              });
+              resolve(result as CloudinaryResult);
+            }
+          }) as UploadResponseCallback
+        );
 
-      // Write the buffer to the upload stream
-      try {
-        const Readable = require('stream').Readable;
-        const readableStream = new Readable();
-        readableStream.push(buffer);
-        readableStream.push(null);
-        readableStream.pipe(uploadStream);
-      } catch (streamError) {
-        console.error('Error creating upload stream:', streamError);
-        reject(streamError);
-      }
-    });
+        // Write the buffer to the upload stream
+        try {
+          const Readable = require('stream').Readable;
+          const readableStream = new Readable();
+          readableStream.push(buffer);
+          readableStream.push(null);
+          readableStream.pipe(uploadStream);
+        } catch (streamError: any) {
+          console.error('Error creating upload stream:', streamError);
+          reject(new Error(`Failed to create upload stream: ${streamError.message}`));
+        }
+      });
+    } catch (uploadError: any) {
+      console.error('Cloudinary upload failed:', uploadError);
+      return NextResponse.json({ 
+        error: 'Failed to upload to Cloudinary',
+        details: uploadError.message 
+      }, { status: 500 });
+    }
 
     // Convert GPS coordinates from DMS to decimal degrees if available
-    console.log('Processing image metadata:', {
-      hasGPSData: !!(result.image_metadata?.GPSLatitude || result.image_metadata?.GPSLongitude),
-      rawLatitude: result.image_metadata?.GPSLatitude,
-      rawLongitude: result.image_metadata?.GPSLongitude
-    });
+    let latitude, longitude;
+    try {
+      console.log('Processing image metadata:', {
+        hasGPSData: !!(result.image_metadata?.GPSLatitude || result.image_metadata?.GPSLongitude),
+        rawLatitude: result.image_metadata?.GPSLatitude,
+        rawLongitude: result.image_metadata?.GPSLongitude
+      });
 
-    const latitude = result.image_metadata?.GPSLatitude ? 
-      convertDMSToDecimal(
-        result.image_metadata.GPSLatitude,
-        result.image_metadata.GPSLatitudeRef || 'N'
-      ) : undefined;
+      latitude = result.image_metadata?.GPSLatitude ? 
+        convertDMSToDecimal(
+          result.image_metadata.GPSLatitude,
+          result.image_metadata.GPSLatitudeRef || 'N'
+        ) : undefined;
 
-    const longitude = result.image_metadata?.GPSLongitude ?
-      convertDMSToDecimal(
-        result.image_metadata.GPSLongitude,
-        result.image_metadata.GPSLongitudeRef || 'E'
-      ) : undefined;
+      longitude = result.image_metadata?.GPSLongitude ?
+        convertDMSToDecimal(
+          result.image_metadata.GPSLongitude,
+          result.image_metadata.GPSLongitudeRef || 'E'
+        ) : undefined;
 
-    console.log('Converted coordinates:', { latitude, longitude });
+      console.log('Converted coordinates:', { latitude, longitude });
+    } catch (gpsError: any) {
+      console.error('Error processing GPS data:', gpsError);
+      // Don't return error here, just log it as GPS data is optional
+    }
 
     // Parse the original capture date
-    const parsedDate = result.image_metadata?.DateTimeOriginal
-      ? (() => {
-          const dateStr = result.image_metadata.DateTimeOriginal.replace(/(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3');
-          const date = new Date(dateStr);
-          console.log('Parsed date:', {
-            original: result.image_metadata.DateTimeOriginal,
-            converted: dateStr,
-            parsed: date,
-            isValid: !isNaN(date.getTime())
-          });
-          return !isNaN(date.getTime()) ? date : new Date();
-        })()
-      : new Date();
+    let parsedDate;
+    try {
+      parsedDate = result.image_metadata?.DateTimeOriginal
+        ? (() => {
+            const dateStr = result.image_metadata.DateTimeOriginal.replace(/(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3');
+            const date = new Date(dateStr);
+            console.log('Parsed date:', {
+              original: result.image_metadata.DateTimeOriginal,
+              converted: dateStr,
+              parsed: date,
+              isValid: !isNaN(date.getTime())
+            });
+            return !isNaN(date.getTime()) ? date : new Date();
+          })()
+        : new Date();
+    } catch (dateError: any) {
+      console.error('Error parsing date:', dateError);
+      parsedDate = new Date(); // Use current date as fallback
+    }
 
     // Ensure MongoDB connection before saving
-    console.log('Connecting to MongoDB...');
-    await connectDB();
+    try {
+      console.log('Connecting to MongoDB...');
+      await connectDB();
+    } catch (dbError: any) {
+      console.error('MongoDB connection error:', dbError);
+      return NextResponse.json({ 
+        error: 'Database connection failed',
+        details: dbError.message 
+      }, { status: 500 });
+    }
     
     // Save to database with metadata if available
-    const photoData = {
-      imageUrl: result.secure_url,
-      description,
-      location,
-      createdAt: new Date(),
-      capturedAt: new Date(parsedDate),
-      metadata: {
-        latitude: latitude || null,
-        longitude: longitude || null,
-        originalLocation: location,
-        coordinates: latitude && longitude ? `${latitude},${longitude}` : null,
-      }
-    };
+    let photo;
+    try {
+      const photoData = {
+        imageUrl: result.secure_url,
+        description,
+        location,
+        createdAt: new Date(),
+        capturedAt: new Date(parsedDate),
+        metadata: {
+          latitude: latitude || null,
+          longitude: longitude || null,
+          originalLocation: location,
+          coordinates: latitude && longitude ? `${latitude},${longitude}` : null,
+        }
+      };
 
-    console.log('Creating photo document:', {
-      hasImageUrl: !!photoData.imageUrl,
-      metadata: photoData.metadata
-    });
+      console.log('Creating photo document:', {
+        hasImageUrl: !!photoData.imageUrl,
+        metadata: photoData.metadata
+      });
 
-    const photo = await Photo.create(photoData);
-    console.log('Photo document created:', { id: photo._id });
+      photo = await Photo.create(photoData);
+      console.log('Photo document created:', { id: photo._id });
+    } catch (saveError: any) {
+      console.error('Error saving to database:', saveError);
+      return NextResponse.json({ 
+        error: 'Failed to save photo to database',
+        details: saveError.message 
+      }, { status: 500 });
+    }
 
     // Convert MongoDB document to a plain object and handle dates
-    const photoObj = JSON.parse(JSON.stringify(photo));
-    const response = {
-      ...photoObj,
-      _id: photo._id.toString(),
-      createdAt: photo.createdAt instanceof Date ? photo.createdAt.toISOString() : new Date().toISOString(),
-      capturedAt: photo.capturedAt instanceof Date ? photo.capturedAt.toISOString() : parsedDate.toISOString()
-    };
+    try {
+      const photoObj = JSON.parse(JSON.stringify(photo));
+      const response = {
+        ...photoObj,
+        _id: photo._id.toString(),
+        createdAt: photo.createdAt instanceof Date ? photo.createdAt.toISOString() : new Date().toISOString(),
+        capturedAt: photo.capturedAt instanceof Date ? photo.capturedAt.toISOString() : parsedDate.toISOString()
+      };
 
-    console.log('Sending response:', {
-      id: response._id,
-      hasImageUrl: !!response.imageUrl
-    });
+      console.log('Sending response:', {
+        id: response._id,
+        hasImageUrl: !!response.imageUrl
+      });
 
-    return NextResponse.json(response);
+      return NextResponse.json(response);
+    } catch (responseError: any) {
+      console.error('Error formatting response:', responseError);
+      return NextResponse.json({ 
+        error: 'Failed to format response',
+        details: responseError.message 
+      }, { status: 500 });
+    }
   } catch (error: any) {
     console.error('Error creating photo:', {
       error,
@@ -279,7 +344,11 @@ export async function POST(request: Request) {
       cause: error.cause
     });
     return NextResponse.json(
-      { error: error.message || 'Error creating photo' },
+      { 
+        error: 'Error creating photo',
+        details: error.message,
+        name: error.name
+      },
       { status: 500 }
     );
   }
