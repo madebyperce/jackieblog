@@ -47,4 +47,44 @@ export async function DELETE(
       { status: 500 }
     );
   }
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { description, location } = body;
+
+    await connectDB();
+
+    // Update the photo
+    const photo = await Photo.findByIdAndUpdate(
+      params.id,
+      { 
+        ...(description && { description }),
+        ...(location && { location })
+      },
+      { new: true }
+    );
+
+    if (!photo) {
+      return NextResponse.json({ error: 'Photo not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(photo);
+  } catch (error) {
+    console.error('Error updating photo:', error);
+    return NextResponse.json(
+      { error: 'Error updating photo' },
+      { status: 500 }
+    );
+  }
 } 

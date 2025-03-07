@@ -3,6 +3,7 @@
 import { useSession } from 'next-auth/react';
 import AdminLogin from '@/app/components/AdminLogin';
 import PhotoUpload from '@/app/components/PhotoUpload';
+import PhotoManager from '@/app/components/PhotoManager';
 
 export default function AdminPage() {
   const { data: session, status } = useSession();
@@ -33,7 +34,7 @@ export default function AdminPage() {
 
   // Show admin dashboard if authenticated
   return (
-    <div className="max-w-4xl mx-auto p-8">
+    <div className="max-w-6xl mx-auto p-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Admin Dashboard</h1>
         <a
@@ -46,7 +47,15 @@ export default function AdminPage() {
       <div className="mb-8">
         <AdminLogin />
       </div>
-      <PhotoUpload />
+      <div className="space-y-12">
+        <section>
+          <h2 className="text-xl font-bold mb-4">Upload New Photo</h2>
+          <PhotoUpload />
+        </section>
+        <section>
+          <PhotoManager />
+        </section>
+      </div>
     </div>
   );
 } 
