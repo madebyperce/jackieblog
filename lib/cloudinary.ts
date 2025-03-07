@@ -14,22 +14,29 @@ if (!process.env.CLOUDINARY_CLOUD_NAME ||
   throw new Error('Please define Cloudinary environment variables');
 }
 
+// Configure Cloudinary
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure: true
 });
 
 // Test configuration
 try {
   const testConfig = cloudinary.config();
+  if (!testConfig.cloud_name || !testConfig.api_key || !testConfig.api_secret) {
+    throw new Error('Invalid Cloudinary configuration');
+  }
   console.log('Cloudinary configured successfully:', {
     cloudName: testConfig.cloud_name,
     hasApiKey: !!testConfig.api_key,
-    hasApiSecret: !!testConfig.api_secret
+    hasApiSecret: !!testConfig.api_secret,
+    isSecure: testConfig.secure
   });
 } catch (error) {
   console.error('Error testing Cloudinary configuration:', error);
+  throw error; // Re-throw to prevent app from starting with invalid config
 }
 
 export default cloudinary; 
