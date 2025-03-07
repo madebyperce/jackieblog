@@ -8,7 +8,7 @@ export function transformCoordinates(metadata: any): any {
   // If metadata has longitude and it's positive, make it negative
   if (typeof metadata.longitude === 'number' && metadata.longitude > 0) {
     // Check if this is likely a western hemisphere location (North America)
-    // Most of North America is between latitudes 25° and 50° N
+    // Most of North America is between latitudes 24° and 50° N
     const isLikelyWesternHemisphere = 
       typeof metadata.latitude === 'number' && 
       metadata.latitude >= 24 && 

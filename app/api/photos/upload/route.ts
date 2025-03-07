@@ -44,10 +44,10 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(bytes);
 
     // Upload to Cloudinary
-    const uploadResponse = await new Promise((resolve, reject) => {
+    const uploadResponse = await new Promise<any>((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         { folder: 'jackie-blog' },
-        (error, result) => {
+        (error: any, result: any) => {
           if (error) reject(error);
           else resolve(result);
         }
@@ -65,18 +65,18 @@ export async function POST(request: Request) {
     await connectDB();
 
     // Process coordinates to ensure western hemisphere locations have negative longitude
-    let metadata = {};
+    let photoMetadata = {};
     if (uploadResponse.metadata && uploadResponse.metadata.gps) {
       const { latitude, longitude } = uploadResponse.metadata.gps;
       if (typeof latitude === 'number' && typeof longitude === 'number') {
         // If it's likely a US location (latitude between 24-50) and longitude is positive
         if (latitude >= 24 && latitude <= 50 && longitude > 0) {
-          metadata = {
+          photoMetadata = {
             latitude,
             longitude: -longitude // Apply negative transformation
           };
         } else {
-          metadata = { latitude, longitude };
+          photoMetadata = { latitude, longitude };
         }
       }
     }
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
       description,
       location,
       capturedAt: capturedAt || new Date().toISOString(),
-      metadata,
+      metadata: photoMetadata,
       authorId: session.user.id,
       authorName: session.user.name,
     });
