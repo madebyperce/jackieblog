@@ -12,16 +12,38 @@ declare module 'next-auth' {
   }
 }
 
+if (!process.env.NEXTAUTH_SECRET) {
+  throw new Error('Please define NEXTAUTH_SECRET environment variable');
+}
+
+if (!process.env.ADMIN_PASSWORD) {
+  throw new Error('Please define ADMIN_PASSWORD environment variable');
+}
+
 const authOptions: NextAuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
     CredentialsProvider({
+      id: 'credentials',
       name: 'Password',
       credentials: {
-        password: { label: 'Password', type: 'password' },
+        password: { 
+          label: 'Password', 
+          type: 'password',
+          placeholder: 'Enter password'
+        },
       },
       async authorize(credentials) {
-        if (credentials?.password === process.env.ADMIN_PASSWORD) {
-          return { id: '1', name: 'Admin' };
+        if (!credentials?.password) {
+          return null;
+        }
+
+        if (credentials.password === process.env.ADMIN_PASSWORD) {
+          return { 
+            id: '1', 
+            name: 'Admin',
+            email: 'admin@example.com' 
+          };
         }
         return null;
       },

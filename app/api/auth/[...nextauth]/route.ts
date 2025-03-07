@@ -1,8 +1,11 @@
 import NextAuth from "next-auth";
 import authOptions from "@/lib/auth";
 
-async function handler(req: Request) {
-  return NextAuth(authOptions)(req);
-}
+const handler = NextAuth(authOptions);
 
-export { handler as GET, handler as POST }; 
+export { handler as GET, handler as POST };
+
+// Workaround for handling preflight requests
+export async function OPTIONS() {
+  return new Response(null, { status: 200 });
+} 
