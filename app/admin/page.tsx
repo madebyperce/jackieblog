@@ -1,26 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import AdminLogin from '@/app/components/AdminLogin';
 import PhotoUpload from '@/app/components/PhotoUpload';
 
 export default function AdminPage() {
-  const { data: session, status } = useSession({
-    required: true,
-    onUnauthenticated() {
-      // Don't do anything here, we'll handle it in the UI
-    },
-  });
-  const router = useRouter();
-
-  // Redirect to home if not authenticated
-  useEffect(() => {
-    if (!session && status !== 'loading') {
-      router.replace('/');
-    }
-  }, [session, status, router]);
+  const { data: session, status } = useSession();
 
   // Show loading state while checking session
   if (status === 'loading') {
