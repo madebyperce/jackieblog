@@ -8,6 +8,7 @@ import Photo from '@/models/Photo';
 import Comment from '@/models/Comment';
 import { Readable } from 'stream';
 import { UploadStream } from 'cloudinary';
+import { promisify } from 'util';
 
 type CloudinaryResult = UploadApiResponse & {
   image_metadata?: {
@@ -185,32 +186,47 @@ export async function POST(request: Request) {
     }
 
     // Upload to Cloudinary with metadata extraction
-    let result;
+    let result: CloudinaryResult;
     try {
       console.log('Starting Cloudinary upload with config:', {
         cloudName: process.env.CLOUDINARY_CLOUD_NAME,
         hasApiKey: !!process.env.CLOUDINARY_API_KEY,
-        hasApiSecret: !!process.env.CLOUDINARY_API_SECRET
+        hasApiSecret: !!process.env.CLOUDINARY_API_SECRET,
+        imageType: image.type,
+        imageSize: image.size
       });
 
-      result = await new Promise<CloudinaryResult>((resolve, reject) => {
-        cloudinary.uploader.upload_stream({
-          folder: 'jackie-blog',
-          resource_type: 'auto',
-          image_metadata: true,
-        }, (error: UploadApiErrorResponse | undefined, result?: UploadApiResponse) => {
-          if (error) {
-            console.error('Cloudinary upload error:', error);
-            reject(error);
-            return;
+      try {
+        // Upload directly using base64
+        const base64Data = buffer.toString('base64');
+        const uploadResponse = await cloudinary.uploader.upload(
+          `data:${image.type};base64,${base64Data}`,
+          {
+            folder: 'jackie-blog',
+            resource_type: 'auto',
+            image_metadata: true
           }
-          if (!result) {
-            reject(new Error('No result from Cloudinary'));
-            return;
-          }
-          resolve(result as CloudinaryResult);
-        }).end(buffer);
-      });
+        );
+
+        if (!uploadResponse) {
+          throw new Error('No response from Cloudinary');
+        }
+
+        result = uploadResponse as CloudinaryResult;
+        console.log('Upload successful:', {
+          publicId: result.public_id,
+          url: result.secure_url,
+          hasMetadata: !!result.image_metadata
+        });
+      } catch (directUploadError: any) {
+        console.error('Direct upload error:', {
+          error: directUploadError,
+          message: directUploadError.message,
+          name: directUploadError.name,
+          http_code: directUploadError.http_code
+        });
+        throw directUploadError;
+      }
 
     } catch (uploadError: any) {
       console.error('Cloudinary upload failed:', {
