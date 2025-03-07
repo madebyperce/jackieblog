@@ -192,89 +192,26 @@ export async function POST(request: Request) {
         hasApiKey: !!process.env.CLOUDINARY_API_KEY,
         hasApiSecret: !!process.env.CLOUDINARY_API_SECRET
       });
+
       result = await new Promise<CloudinaryResult>((resolve, reject) => {
-        let uploadStream: UploadStream | undefined;
-        let readableStream: Readable | undefined;
-        
-        try {
-          // Create readable stream first
-          readableStream = new Readable();
-          readableStream.push(buffer);
-          readableStream.push(null);
-
-          // Set up error handlers for readable stream
-          readableStream.on('error', (streamError: any) => {
-            console.error('Readable stream error:', {
-              error: streamError,
-              message: streamError.message,
-              stack: streamError.stack
-            });
-            reject(new Error(`Stream error: ${streamError.message}`));
-          });
-
-          // Create upload stream with error handling
-          uploadStream = cloudinary.uploader.upload_stream(
-            {
-              folder: 'jackie-blog',
-              resource_type: 'auto',
-              image_metadata: true,
-            },
-            (err: UploadApiErrorResponse | undefined, result?: UploadApiResponse) => {
-              if (err) {
-                console.error('Cloudinary upload callback error:', {
-                  error: err,
-                  message: err.message,
-                  http_code: err.http_code,
-                  name: err.name,
-                  stack: err.stack
-                });
-                reject(err);
-                return;
-              }
-              if (!result) {
-                console.error('No result from Cloudinary upload');
-                reject(new Error('No result from Cloudinary'));
-                return;
-              }
-              console.log('Cloudinary upload successful:', {
-                publicId: result.public_id,
-                url: result.secure_url,
-                hasMetadata: !!result.image_metadata,
-                format: result.format,
-                size: result.bytes
-              });
-              resolve(result as CloudinaryResult);
-            }
-          );
-
-          // Set up error handler for upload stream
-          uploadStream.on('error', (uploadError: any) => {
-            console.error('Upload stream error:', {
-              error: uploadError,
-              message: uploadError.message,
-              stack: uploadError.stack
-            });
-            reject(new Error(`Upload stream error: ${uploadError.message}`));
-          });
-
-          // Pipe the streams with error handling
-          if (!readableStream || !uploadStream) {
-            throw new Error('Failed to create streams');
+        cloudinary.uploader.upload_stream({
+          folder: 'jackie-blog',
+          resource_type: 'auto',
+          image_metadata: true,
+        }, (error: UploadApiErrorResponse | undefined, result?: UploadApiResponse) => {
+          if (error) {
+            console.error('Cloudinary upload error:', error);
+            reject(error);
+            return;
           }
-          readableStream.pipe(uploadStream);
-
-        } catch (setupError: any) {
-          console.error('Error setting up streams:', {
-            error: setupError,
-            message: setupError.message,
-            stack: setupError.stack
-          });
-          // Clean up streams
-          readableStream?.destroy();
-          uploadStream?.destroy();
-          reject(new Error(`Failed to setup upload: ${setupError.message}`));
-        }
+          if (!result) {
+            reject(new Error('No result from Cloudinary'));
+            return;
+          }
+          resolve(result as CloudinaryResult);
+        }).end(buffer);
       });
+
     } catch (uploadError: any) {
       console.error('Cloudinary upload failed:', {
         error: uploadError,
