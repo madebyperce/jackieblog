@@ -1,29 +1,19 @@
-import { Suspense } from 'react';
+import { Metadata } from 'next';
 import PhotoGallery from '@/components/PhotoGallery';
-import { getPhotos } from '@/lib/photos';
+import { getAllPhotos } from '@/lib/photos';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+export const metadata: Metadata = {
+  title: 'Photo Gallery | Jackie\'s Blog',
+  description: 'Browse through Jackie\'s photo collection',
+};
 
 export default async function PhotosPage() {
-  const photos = await getPhotos();
+  const photos = await getAllPhotos();
   
   return (
-    <div className="container mx-auto px-4 py-8">
-      <Suspense fallback={<div>Loading photos...</div>}>
-        <PhotoGallery photos={photos} />
-      </Suspense>
-      
-      {/* Remove any additional pagination components that might be here */}
-      {/* For example, if there's something like this:
-      
-      <div className="flex justify-center mt-8">
-        <nav className="inline-flex rounded-md shadow">
-          ... pagination buttons ...
-        </nav>
-      </div>
-      
-      It should be removed */}
+    <div className="container mx-auto py-8 px-4">
+      <h1 className="text-3xl font-bold mb-8 text-center">Photo Gallery</h1>
+      <PhotoGallery photos={photos} />
     </div>
   );
 } 
