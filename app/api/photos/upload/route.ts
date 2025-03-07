@@ -1,14 +1,3 @@
-// Find the section where the photo is being created/saved
-// This might be after processing the uploaded file and extracting metadata
-
-// Before saving the photo to the database, add this code:
-if (metadata && typeof metadata.longitude === 'number' && metadata.longitude > 0) {
-  console.log(`Transforming positive longitude ${metadata.longitude} to negative during upload`);
-  metadata.longitude = -metadata.longitude;
-}
-
-// Then continue with saving the photo 
-
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
