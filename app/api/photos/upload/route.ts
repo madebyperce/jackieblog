@@ -14,17 +14,11 @@ import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
 import connectDB from '@/lib/mongodb';
 import Photo from '@/models/Photo';
-import { transformCoordinates } from '@/lib/transformCoordinates';
 import cloudinary from '@/lib/cloudinary';
-import { IncomingForm } from 'formidable';
-import { promises as fs } from 'fs';
-import exifr from 'exifr'; // Make sure this is installed: npm install exifr
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+// Modern App Router configuration
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60; // Set an appropriate timeout for file uploads
 
 export async function POST(request: Request) {
   try {
@@ -49,27 +43,6 @@ export async function POST(request: Request) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Extract EXIF metadata including GPS coordinates
-    let metadata = {};
-    try {
-      const exifData = await exifr.parse(buffer, { gps: true });
-      if (exifData) {
-        // Extract GPS coordinates if available
-        if (exifData.latitude !== undefined && exifData.longitude !== undefined) {
-          metadata = {
-            latitude: exifData.latitude,
-            longitude: exifData.longitude
-          };
-          
-          // Transform coordinates to ensure western hemisphere locations have negative longitude
-          metadata = transformCoordinates(metadata);
-        }
-      }
-    } catch (exifError) {
-      console.error('Error extracting EXIF data:', exifError);
-      // Continue without metadata if extraction fails
-    }
-
     // Upload to Cloudinary
     const uploadResponse = await new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
@@ -90,6 +63,23 @@ export async function POST(request: Request) {
 
     // Connect to database
     await connectDB();
+
+    // Process coordinates to ensure western hemisphere locations have negative longitude
+    let metadata = {};
+    if (uploadResponse.metadata && uploadResponse.metadata.gps) {
+      const { latitude, longitude } = uploadResponse.metadata.gps;
+      if (typeof latitude === 'number' && typeof longitude === 'number') {
+        // If it's likely a US location (latitude between 24-50) and longitude is positive
+        if (latitude >= 24 && latitude <= 50 && longitude > 0) {
+          metadata = {
+            latitude,
+            longitude: -longitude // Apply negative transformation
+          };
+        } else {
+          metadata = { latitude, longitude };
+        }
+      }
+    }
 
     // Create new photo document
     const newPhoto = new Photo({
