@@ -209,11 +209,11 @@ export default function PhotoGrid() {
       </div>
 
       {view === 'thumbnails' ? (
-        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-1 sm:gap-2">
           {photos.map((photo) => (
             <div
               key={photo._id}
-              className="relative w-[100px] h-[100px] cursor-pointer hover:opacity-90 transition-opacity duration-200"
+              className="relative aspect-square w-full cursor-pointer hover:opacity-90 transition-opacity duration-200"
               onClick={() => handleThumbnailClick(photo._id)}
             >
               <Image
@@ -221,27 +221,28 @@ export default function PhotoGrid() {
                 alt={photo.description}
                 fill
                 className="object-cover rounded"
-                sizes="100px"
+                sizes="(max-width: 640px) 33vw, (max-width: 768px) 25vw, (max-width: 1024px) 16.67vw, (max-width: 1280px) 12.5vw, 10vw"
                 priority={true}
               />
             </div>
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-8 max-w-[500px] mx-auto">
+        <div className="grid grid-cols-1 gap-8 w-full max-w-[500px] mx-auto">
           {currentPhotos.map((photo) => (
             <div 
               key={photo._id} 
               id={`photo-${photo._id}`}
               className="border-2 border-gray-300 rounded-lg overflow-hidden bg-white shadow-lg scroll-mt-8"
             >
-              <div className="relative w-[500px]">
+              <div className="relative w-full">
                 <Image
                   src={photo.imageUrl}
                   alt={photo.description}
                   width={500}
-                  height={375}
-                  className="w-full"
+                  height={500}
+                  className="w-full h-auto"
+                  sizes="(max-width: 500px) 100vw, 500px"
                   priority={currentPage === 1}
                 />
               </div>
