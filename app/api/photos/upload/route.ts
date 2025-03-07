@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     }
 
     // Upload to Cloudinary
-    const uploadResponse = await new Promise((resolve, reject) => {
+    const uploadResponse = await new Promise<any>((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         { folder: 'jackie-blog' },
         (error, result) => {
