@@ -20,11 +20,8 @@ import { IncomingForm } from 'formidable';
 import { promises as fs } from 'fs';
 import exifr from 'exifr'; // Make sure this is installed: npm install exifr
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
   try {
