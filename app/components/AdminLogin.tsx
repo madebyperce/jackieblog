@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { signIn, signOut, useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 interface LoginForm {
   password: string;
@@ -14,6 +14,7 @@ export default function AdminLogin() {
   const { register, handleSubmit, setError, formState: { errors } } = useForm<LoginForm>();
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
 
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
@@ -29,8 +30,12 @@ export default function AdminLogin() {
           message: 'Invalid password',
         });
       } else {
-        // Refresh the page to update the session
-        router.refresh();
+        // If we're not on the admin page, redirect there
+        if (pathname !== '/admin') {
+          router.push('/admin');
+        } else {
+          router.refresh();
+        }
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -55,7 +60,11 @@ export default function AdminLogin() {
         <button
           onClick={async () => {
             await signOut({ redirect: false });
-            router.refresh();
+            if (pathname === '/admin') {
+              router.push('/');
+            } else {
+              router.refresh();
+            }
           }}
           className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition"
         >

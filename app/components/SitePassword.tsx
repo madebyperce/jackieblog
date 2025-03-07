@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+import { usePathname } from 'next/navigation';
 
 interface PasswordForm {
   password: string;
@@ -10,6 +11,7 @@ interface PasswordForm {
 export default function SitePassword({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { register, handleSubmit, formState: { errors } } = useForm<PasswordForm>();
+  const pathname = usePathname();
   
   useEffect(() => {
     // Check if user has already entered password
@@ -18,6 +20,11 @@ export default function SitePassword({ children }: { children: React.ReactNode }
       setIsAuthenticated(true);
     }
   }, []);
+
+  // Skip password check for auth-related routes
+  if (pathname?.startsWith('/api/auth') || pathname === '/admin') {
+    return <>{children}</>;
+  }
 
   const onSubmit = async (data: PasswordForm) => {
     // You can change this to any password you want
