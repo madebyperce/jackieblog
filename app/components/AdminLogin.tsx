@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { signIn, signOut, useSession } from 'next-auth/react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 interface LoginForm {
   password: string;
@@ -14,7 +14,6 @@ export default function AdminLogin() {
   const { register, handleSubmit, setError, formState: { errors } } = useForm<LoginForm>();
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const pathname = usePathname();
 
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
@@ -30,12 +29,7 @@ export default function AdminLogin() {
           message: 'Invalid password',
         });
       } else {
-        // If we're not on the admin page, redirect there
-        if (pathname !== '/admin') {
-          router.push('/admin');
-        } else {
-          router.refresh();
-        }
+        router.push('/admin');
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -48,23 +42,14 @@ export default function AdminLogin() {
     }
   };
 
-  // Show loading state while checking session
-  if (status === 'loading') {
-    return <div className="text-center">Loading...</div>;
-  }
-
   if (session?.user) {
     return (
       <div className="flex justify-between items-center bg-green-100 p-4 rounded-lg">
         <span className="text-green-800">Logged in as admin</span>
         <button
           onClick={async () => {
-            await signOut({ redirect: false });
-            if (pathname === '/admin') {
-              router.push('/');
-            } else {
-              router.refresh();
-            }
+            const data = await signOut({ redirect: false });
+            router.push('/');
           }}
           className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition"
         >
@@ -82,6 +67,7 @@ export default function AdminLogin() {
           {...register('password', { required: 'Password is required' })}
           placeholder="Enter admin password"
           className="w-full p-2 border rounded"
+          autoComplete="current-password"
         />
         {errors.password && (
           <p className="text-red-500 text-sm mt-1">{errors.password.message}</p>

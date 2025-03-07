@@ -7,28 +7,46 @@ import AdminLogin from '@/app/components/AdminLogin';
 import PhotoUpload from '@/app/components/PhotoUpload';
 
 export default function AdminPage() {
-  const { data: session, status } = useSession();
+  const { data: session, status } = useSession({
+    required: true,
+    onUnauthenticated() {
+      // Don't do anything here, we'll handle it in the UI
+    },
+  });
   const router = useRouter();
 
+  // Only redirect if we're definitely not authenticated
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/');
+      router.replace('/');
     }
   }, [status, router]);
 
+  // Show loading state while checking session
   if (status === 'loading') {
-    return <div className="p-8 text-center">Loading...</div>;
-  }
-
-  if (!session) {
     return (
-      <div className="max-w-md mx-auto p-8">
-        <h1 className="text-2xl font-bold mb-6">Admin Login</h1>
-        <AdminLogin />
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p>Loading...</p>
+        </div>
       </div>
     );
   }
 
+  // Show login form if not authenticated
+  if (!session) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="max-w-md w-full p-8">
+          <h1 className="text-2xl font-bold mb-6 text-center">Admin Login</h1>
+          <AdminLogin />
+        </div>
+      </div>
+    );
+  }
+
+  // Show admin dashboard if authenticated
   return (
     <div className="max-w-4xl mx-auto p-8">
       <div className="flex justify-between items-center mb-6">
