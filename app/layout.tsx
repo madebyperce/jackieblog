@@ -12,8 +12,8 @@ const workSans = Work_Sans({
 });
 
 export const metadata = {
-  title: "Jackie's Blog",
-  description: 'A personal blog showcasing photos and stories',
+  title: "Jackie's Adventures",
+  description: 'perce made a website for her dog...!',
 };
 
 export default function RootLayout({
