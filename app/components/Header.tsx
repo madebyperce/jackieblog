@@ -1,41 +1,30 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 
 export default function Header() {
   const [imageError, setImageError] = useState(false);
-  const [pngFailed, setPngFailed] = useState(false);
-
-  console.log('Header component rendering, imageError:', imageError);
-
-  if (imageError) {
-    return (
-      <header className="mb-8 flex justify-center">
-        <h1 className="text-4xl font-medium text-center font-work-sans">Jackie's Adventures</h1>
-      </header>
-    );
-  }
-
+  
   return (
-    <header className="mb-8 flex justify-center">
-      <div className="relative w-[600px] h-[120px] border border-dashed border-gray-300">
-        <img
-          src={pngFailed ? "/header.jpg" : "/header.png"}
-          alt="Jackie's Adventures"
-          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-          onError={(e) => {
-            console.error('Image failed to load:', e);
-            if (!pngFailed) {
-              console.log('PNG failed, trying JPG...');
-              setPngFailed(true);
-            } else {
-              setImageError(true);
-            }
-          }}
-          onLoad={() => {
-            console.log('Image loaded successfully');
-          }}
-        />
+    <header className="w-full pt-10 flex justify-center">
+      <div className="relative w-full max-w-[500px] h-[140px] overflow-hidden">
+        <Link href="/">
+          {imageError ? (
+            <div className="w-full h-full flex items-center justify-center">
+              <h1 className="text-3xl font-bold text-gray-700">Jackie's Adventures</h1>
+            </div>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <img
+                src="/header.png"
+                alt="Jackie's Adventures"
+                className="max-h-full max-w-full object-contain"
+                onError={() => setImageError(true)}
+              />
+            </div>
+          )}
+        </Link>
       </div>
     </header>
   );

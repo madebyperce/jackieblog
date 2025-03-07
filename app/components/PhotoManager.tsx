@@ -20,6 +20,10 @@ interface Photo {
   createdAt: string;
   capturedAt: string;
   comments: Comment[];
+  metadata?: {
+    latitude?: number;
+    longitude?: number;
+  };
 }
 
 export default function PhotoManager() {
@@ -31,6 +35,8 @@ export default function PhotoManager() {
   const [editDescription, setEditDescription] = useState('');
   const [editLocation, setEditLocation] = useState('');
   const [editCommentContent, setEditCommentContent] = useState('');
+  const [transformingLocations, setTransformingLocations] = useState(false);
+  const [transformResult, setTransformResult] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -181,6 +187,69 @@ export default function PhotoManager() {
     }
   };
 
+  const debugLocations = () => {
+    console.log('Debugging photo coordinates:');
+    photos.forEach(photo => {
+      console.log(`Photo ID: ${photo._id}`);
+      console.log(`User-entered location: ${photo.location || 'undefined'}`);
+      
+      if (photo.metadata && typeof photo.metadata.latitude === 'number' && typeof photo.metadata.longitude === 'number') {
+        console.log(`Latitude: ${photo.metadata.latitude}`);
+        console.log(`Longitude: ${photo.metadata.longitude}`);
+      } else {
+        console.log('No coordinates found in metadata');
+      }
+      console.log('---');
+    });
+  };
+
+  const handleTransformAllLocations = async () => {
+    if (!confirm('Are you sure you want to apply a -1 transformation to all positive longitude values? This operation cannot be undone.')) {
+      return;
+    }
+
+    setTransformingLocations(true);
+    setTransformResult(null);
+
+    try {
+      // First try the original endpoint
+      let response = await fetch('/api/photos/transform-locations', {
+        method: 'POST',
+      });
+
+      let data = await response.json();
+
+      // If no photos were transformed, try the alternative Mongoose endpoint
+      if (response.ok && data.message.includes('transformed 0')) {
+        console.log('First attempt transformed 0 photos, trying alternative method...');
+        
+        response = await fetch('/api/photos/transform-mongoose', {
+          method: 'POST',
+        });
+        
+        data = await response.json();
+      }
+
+      if (response.ok) {
+        setTransformResult(`Success: ${data.message}`);
+        // Refresh photos to show updated locations
+        fetchPhotos();
+      } else {
+        throw new Error(data.error || 'Failed to transform locations');
+      }
+    } catch (error) {
+      console.error('Error transforming locations:', error);
+      setTransformResult(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setTransformingLocations(false);
+    }
+  };
+
+  const handleViewModeToggle = () => {
+    alert('Toggle button clicked');
+    // rest of the function
+  };
+
   if (loading) {
     return <div className="text-center py-8">Loading photos...</div>;
   }
@@ -191,7 +260,37 @@ export default function PhotoManager() {
 
   return (
     <div className="space-y-8">
-      <h2 className="text-xl font-bold mb-4">Manage Photos</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold">Manage Photos</h2>
+        <div className="space-x-2">
+          <button
+            onClick={debugLocations}
+            className="px-4 py-2 rounded text-white bg-gray-500 hover:bg-gray-600"
+          >
+            Debug Locations
+          </button>
+          <button
+            onClick={handleTransformAllLocations}
+            disabled={transformingLocations}
+            className={`px-4 py-2 rounded text-white ${
+              transformingLocations ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'
+            }`}
+          >
+            {transformingLocations ? 'Processing...' : 'Fix All Locations'}
+          </button>
+        </div>
+      </div>
+
+      {transformResult && (
+        <div className={`p-4 rounded ${
+          transformResult.startsWith('Success') 
+            ? 'bg-green-100 text-green-800' 
+            : 'bg-red-100 text-red-800'
+        }`}>
+          {transformResult}
+        </div>
+      )}
+
       {photos.map(photo => (
         <div key={photo._id} className="border rounded-lg p-6 space-y-4 bg-white shadow">
           <div className="flex items-start gap-6">
@@ -239,6 +338,14 @@ export default function PhotoManager() {
                 <>
                   <p className="text-lg">{photo.description}</p>
                   <p className="text-gray-600">{photo.location}</p>
+                  
+                  {/* Display GPS coordinates if available */}
+                  {photo.metadata?.latitude !== undefined && photo.metadata?.longitude !== undefined && (
+                    <p className="text-sm text-gray-500">
+                      GPS: {photo.metadata.latitude.toFixed(6)}, {photo.metadata.longitude.toFixed(6)}
+                    </p>
+                  )}
+                  
                   <p className="text-sm text-gray-500">
                     Captured: {format(new Date(photo.capturedAt), 'PPP')}
                   </p>
