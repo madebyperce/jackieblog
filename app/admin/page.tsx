@@ -15,12 +15,12 @@ export default function AdminPage() {
   });
   const router = useRouter();
 
-  // Only redirect if we're definitely not authenticated
+  // Redirect to home if not authenticated
   useEffect(() => {
-    if (status === 'unauthenticated') {
+    if (!session && status !== 'loading') {
       router.replace('/');
     }
-  }, [status, router]);
+  }, [session, status, router]);
 
   // Show loading state while checking session
   if (status === 'loading') {
