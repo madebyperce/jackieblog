@@ -18,10 +18,7 @@ const nextConfig = {
       fs: false,
     };
     return config;
-  },
-  experimental: {
-    serverActions: true,
-  },
+  }
 };
 
 module.exports = nextConfig; 

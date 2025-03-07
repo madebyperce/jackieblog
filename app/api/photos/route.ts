@@ -2,10 +2,12 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
 import cloudinary from '@/lib/cloudinary';
-import { UploadApiResponse, UploadApiErrorResponse, UploadResponseCallback } from 'cloudinary/types';
+import { UploadApiResponse, UploadApiErrorResponse } from 'cloudinary/types';
 import connectDB from '@/lib/mongodb';
 import Photo from '@/models/Photo';
 import Comment from '@/models/Comment';
+import { Readable } from 'stream';
+import { UploadStream } from 'cloudinary';
 
 type CloudinaryResult = UploadApiResponse & {
   image_metadata?: {
@@ -191,12 +193,11 @@ export async function POST(request: Request) {
         hasApiSecret: !!process.env.CLOUDINARY_API_SECRET
       });
       result = await new Promise<CloudinaryResult>((resolve, reject) => {
-        let uploadStream;
-        let readableStream;
+        let uploadStream: UploadStream | undefined;
+        let readableStream: Readable | undefined;
         
         try {
           // Create readable stream first
-          const Readable = require('stream').Readable;
           readableStream = new Readable();
           readableStream.push(buffer);
           readableStream.push(null);
@@ -212,48 +213,39 @@ export async function POST(request: Request) {
           });
 
           // Create upload stream with error handling
-          try {
-            uploadStream = cloudinary.uploader.upload_stream(
-              {
-                folder: 'jackie-blog',
-                resource_type: 'auto',
-                image_metadata: true,
-              },
-              (err: UploadApiErrorResponse | undefined, result?: UploadApiResponse) => {
-                if (err) {
-                  console.error('Cloudinary upload callback error:', {
-                    error: err,
-                    message: err.message,
-                    http_code: err.http_code,
-                    name: err.name,
-                    stack: err.stack
-                  });
-                  reject(err);
-                  return;
-                }
-                if (!result) {
-                  console.error('No result from Cloudinary upload');
-                  reject(new Error('No result from Cloudinary'));
-                  return;
-                }
-                console.log('Cloudinary upload successful:', {
-                  publicId: result.public_id,
-                  url: result.secure_url,
-                  hasMetadata: !!result.image_metadata,
-                  format: result.format,
-                  size: result.bytes
+          uploadStream = cloudinary.uploader.upload_stream(
+            {
+              folder: 'jackie-blog',
+              resource_type: 'auto',
+              image_metadata: true,
+            },
+            (err: UploadApiErrorResponse | undefined, result?: UploadApiResponse) => {
+              if (err) {
+                console.error('Cloudinary upload callback error:', {
+                  error: err,
+                  message: err.message,
+                  http_code: err.http_code,
+                  name: err.name,
+                  stack: err.stack
                 });
-                resolve(result as CloudinaryResult);
+                reject(err);
+                return;
               }
-            );
-          } catch (uploadStreamError: any) {
-            console.error('Error creating upload stream:', {
-              error: uploadStreamError,
-              message: uploadStreamError.message,
-              stack: uploadStreamError.stack
-            });
-            throw uploadStreamError;
-          }
+              if (!result) {
+                console.error('No result from Cloudinary upload');
+                reject(new Error('No result from Cloudinary'));
+                return;
+              }
+              console.log('Cloudinary upload successful:', {
+                publicId: result.public_id,
+                url: result.secure_url,
+                hasMetadata: !!result.image_metadata,
+                format: result.format,
+                size: result.bytes
+              });
+              resolve(result as CloudinaryResult);
+            }
+          );
 
           // Set up error handler for upload stream
           uploadStream.on('error', (uploadError: any) => {
@@ -266,16 +258,10 @@ export async function POST(request: Request) {
           });
 
           // Pipe the streams with error handling
-          try {
-            readableStream.pipe(uploadStream);
-          } catch (pipeError: any) {
-            console.error('Error piping streams:', {
-              error: pipeError,
-              message: pipeError.message,
-              stack: pipeError.stack
-            });
-            throw pipeError;
+          if (!readableStream || !uploadStream) {
+            throw new Error('Failed to create streams');
           }
+          readableStream.pipe(uploadStream);
 
         } catch (setupError: any) {
           console.error('Error setting up streams:', {
@@ -283,13 +269,9 @@ export async function POST(request: Request) {
             message: setupError.message,
             stack: setupError.stack
           });
-          // Clean up streams if they were created
-          if (readableStream) {
-            readableStream.destroy();
-          }
-          if (uploadStream) {
-            uploadStream.destroy();
-          }
+          // Clean up streams
+          readableStream?.destroy();
+          uploadStream?.destroy();
           reject(new Error(`Failed to setup upload: ${setupError.message}`));
         }
       });
