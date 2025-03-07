@@ -5,8 +5,6 @@ import connectDB from '@/lib/mongodb';
 import Photo from '@/models/Photo';
 import { transformCoordinates } from '@/lib/transformCoordinates';
 import cloudinary from '@/lib/cloudinary';
-import { IncomingForm } from 'formidable';
-import { promises as fs } from 'fs';
 import exifr from 'exifr'; // Make sure this is installed: npm install exifr
 
 export const dynamic = 'force-dynamic';
