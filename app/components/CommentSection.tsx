@@ -25,9 +25,10 @@ interface CommentForm {
 
 interface CommentSectionProps {
   photo: Photo;
+  onSubmitComment?: (data: CommentForm) => Promise<void>;
 }
 
-export default function CommentSection({ photo }: CommentSectionProps) {
+export default function CommentSection({ photo, onSubmitComment }: CommentSectionProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { register, handleSubmit, reset, formState: { errors } } = useForm<CommentForm>();
@@ -62,6 +63,14 @@ export default function CommentSection({ photo }: CommentSectionProps) {
     
     setIsSubmitting(true);
     try {
+      // If onSubmitComment prop is provided, use it
+      if (onSubmitComment) {
+        await onSubmitComment(data);
+        reset();
+        return;
+      }
+      
+      // Otherwise use the default implementation
       const response = await fetch(`/api/photos/${photo._id}/comments`, {
         method: 'POST',
         headers: {
@@ -125,7 +134,10 @@ export default function CommentSection({ photo }: CommentSectionProps) {
         <div className="mt-3 space-y-4">
           {comments.length > 0 ? (
             <div className="space-y-3">
-              {[...comments].reverse().map((comment) => (
+              {/* Sort comments from oldest to newest based on createdAt date */}
+              {[...comments]
+                .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+                .map((comment) => (
                 <div key={comment._id} className="bg-gray-50 p-2 rounded text-xs">
                   <div className="flex justify-between items-start">
                     <span className="font-medium">{comment.authorName}</span>

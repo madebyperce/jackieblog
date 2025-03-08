@@ -17,7 +17,7 @@ interface Photo {
   };
 }
 
-// Fetch photos from the same API endpoint that PhotoGallery uses
+// Update the fetchPhotos function to match the approach in PhotoDisplay
 const fetchPhotos = async (): Promise<Photo[]> => {
   try {
     console.log('Fetching photos from API...');
@@ -29,20 +29,38 @@ const fetchPhotos = async (): Promise<Photo[]> => {
         statusText: response.statusText
       });
       
-      // Try to get error details if available
-      try {
-        const errorData = await response.json();
-        console.error('Error details:', errorData);
-      } catch (parseError) {
-        console.error('Could not parse error response');
-      }
-      
       throw new Error(`Failed to fetch photos: ${response.status} ${response.statusText}`);
     }
     
-    const data = await response.json();
-    console.log(`Fetched ${data.photos?.length || 0} photos from API`);
-    return data.photos || [];
+    const result = await response.json();
+    console.log('API response:', result);
+    
+    // Check if the data is an array or if it's nested in a property
+    let photosArray;
+    if (Array.isArray(result)) {
+      photosArray = result;
+    } else if (result.photos && Array.isArray(result.photos)) {
+      photosArray = result.photos;
+    } else if (result.data && Array.isArray(result.data)) {
+      photosArray = result.data;
+    } else {
+      console.error('Unexpected API response format:', result);
+      return [];
+    }
+    
+    console.log(`Processing ${photosArray.length} photos from API`);
+    
+    // Format the photos to match our Photo interface
+    const formattedPhotos = photosArray.map((photo: any) => ({
+      _id: photo._id || photo.id,
+      imageUrl: photo.imageUrl || '',
+      description: photo.description || '',
+      location: photo.location || '',
+      capturedAt: photo.capturedAt || photo.createdAt || '',
+      metadata: photo.metadata || {}
+    }));
+    
+    return formattedPhotos;
   } catch (error) {
     console.error('Error fetching photos:', error);
     return [];

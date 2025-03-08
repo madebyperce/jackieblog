@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { MongoClient, ObjectId } from 'mongodb';
+import { getCorrectCoordinates } from '@/app/lib/coordinateUtils';
 
 // Get MongoDB connection string from environment variable
 const uri = process.env.MONGODB_URI;
@@ -38,23 +39,27 @@ export async function POST(request: Request) {
       console.log(`Processing photo ID: ${photo._id}`);
       
       // Check if the photo has metadata with coordinates
-      if (photo.metadata && typeof photo.metadata.longitude === 'number') {
-        const lat = photo.metadata.latitude;
-        let lng = photo.metadata.longitude;
-        
-        console.log(`Original coordinates: lat=${lat}, lng=${lng}`);
-        
-        // Apply -1 transformation to longitude if it's positive
-        if (lng > 0) {
-          const newLng = -lng;
+      if (photo.metadata) {
+        try {
+          // Get the corrected coordinates using our utility function
+          const correctedCoords = getCorrectCoordinates(photo.metadata);
           
-          console.log(`Transforming longitude from ${lng} to ${newLng}`);
-          
-          try {
-            // Update the photo's longitude in the database
+          if (correctedCoords) {
+            const [lat, lng] = correctedCoords.split(',').map(parseFloat);
+            
+            console.log(`Original coordinates: lat=${photo.metadata.latitude}, lng=${photo.metadata.longitude}`);
+            console.log(`Corrected coordinates: lat=${lat}, lng=${lng}`);
+            
+            // Update the photo's coordinates in the database
             const updateResult = await photosCollection.updateOne(
               { _id: new ObjectId(photo._id) },
-              { $set: { "metadata.longitude": newLng } }
+              { 
+                $set: { 
+                  "metadata.latitude": lat,
+                  "metadata.longitude": lng,
+                  "metadata.coordinates": correctedCoords
+                } 
+              }
             );
             
             console.log(`Update result: ${JSON.stringify(updateResult)}`);
@@ -65,14 +70,14 @@ export async function POST(request: Request) {
             } else {
               console.log(`Failed to update photo ${photo._id} - no documents modified`);
             }
-          } catch (updateError) {
-            console.error(`Error updating photo ${photo._id}:`, updateError);
+          } else {
+            console.log(`Photo ${photo._id} has no valid coordinates to transform`);
           }
-        } else {
-          console.log(`Longitude is already negative (${lng}), no transformation needed`);
+        } catch (updateError) {
+          console.error(`Error updating photo ${photo._id}:`, updateError);
         }
       } else {
-        console.log(`Photo ${photo._id} has no coordinates in metadata`);
+        console.log(`Photo ${photo._id} has no metadata`);
       }
     }
     

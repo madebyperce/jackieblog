@@ -3,6 +3,28 @@ import connectDB from '@/lib/mongodb';
 import Photo from '@/models/Photo';
 import Comment from '@/models/Comment';
 
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    await connectDB();
+    
+    // Find all comments for the specified photo
+    const comments = await Comment.find({ photoId: params.id })
+      .sort({ createdAt: -1 }) // Sort by newest first
+      .lean(); // Convert to plain JavaScript objects
+    
+    return NextResponse.json({ comments });
+  } catch (error) {
+    console.error('Error fetching comments:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch comments' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(
   request: Request,
   { params }: { params: { id: string } }

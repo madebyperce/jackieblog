@@ -81,11 +81,30 @@ export async function DELETE(
     // Connect to the database
     await dbConnect();
 
+    // Find the comment first to get the photoId
+    const comment = await Comment.findById(commentId);
+    
+    if (!comment) {
+      return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
+    }
+    
+    // Get the photoId from the comment
+    const photoId = comment.photoId;
+    
     // Delete the comment
     const deletedComment = await Comment.findByIdAndDelete(commentId);
 
     if (!deletedComment) {
       return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
+    }
+    
+    // Also remove the comment from the photo's comments array
+    if (photoId) {
+      const Photo = require('@/models/Photo').default;
+      await Photo.findByIdAndUpdate(
+        photoId,
+        { $pull: { comments: commentId } }
+      );
     }
 
     // Return success

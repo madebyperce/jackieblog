@@ -43,9 +43,62 @@ const fetchComments = async (): Promise<Comment[]> => {
     
     const data = await response.json();
     console.log(`Fetched ${data.length || 0} comments from API`);
-    return data || [];
+    
+    // If the API returns comments without populated photoId, fetch the photos separately
+    const commentsWithPhotoInfo = await Promise.all(data.map(async (comment: Comment) => {
+      // If photoId is just a string (not populated), fetch the photo info
+      if (comment.photoId && typeof comment.photoId === 'string') {
+        try {
+          const photoResponse = await fetch(`/api/photos/${comment.photoId}`);
+          if (photoResponse.ok) {
+            const photoData = await photoResponse.json();
+            return {
+              ...comment,
+              photoId: photoData
+            };
+          }
+        } catch (error) {
+          console.error(`Error fetching photo for comment ${comment._id}:`, error);
+        }
+      }
+      return comment;
+    }));
+    
+    return commentsWithPhotoInfo || [];
   } catch (error) {
     console.error('Error fetching comments:', error);
+    
+    // Fallback: try to get comments from photos
+    try {
+      console.log('Attempting fallback: fetching photos with comments...');
+      const photosResponse = await fetch('/api/photos?includeComments=true');
+      if (photosResponse.ok) {
+        const photosData = await photosResponse.json();
+        
+        // Extract comments from photos
+        const extractedComments: Comment[] = [];
+        photosData.forEach((photo: any) => {
+          if (photo.comments && Array.isArray(photo.comments)) {
+            photo.comments.forEach((comment: any) => {
+              extractedComments.push({
+                ...comment,
+                photoId: {
+                  _id: photo._id,
+                  description: photo.description,
+                  imageUrl: photo.imageUrl
+                }
+              });
+            });
+          }
+        });
+        
+        console.log(`Extracted ${extractedComments.length} comments from photos`);
+        return extractedComments;
+      }
+    } catch (fallbackError) {
+      console.error('Fallback approach also failed:', fallbackError);
+    }
+    
     return [];
   }
 };
@@ -177,9 +230,26 @@ export default function AdminCommentsPage() {
 
   // Get photo title or fallback
   const getPhotoTitle = (comment: Comment) => {
+    if (!comment.photoId) return 'Unknown Photo';
+    
+    if (typeof comment.photoId === 'string') {
+      return `Photo ID: ${comment.photoId}`;
+    }
+    
     if (comment.photoId?.title) return comment.photoId.title;
     if (comment.photoId?.description) return comment.photoId.description;
     return 'Unknown Photo';
+  };
+
+  // Get photo ID safely
+  const getPhotoId = (comment: Comment): string | undefined => {
+    if (!comment.photoId) return undefined;
+    
+    if (typeof comment.photoId === 'string') {
+      return comment.photoId;
+    }
+    
+    return comment.photoId._id;
   };
 
   // Handle view photo click - opens the main page and scrolls to the specific photo
@@ -362,29 +432,34 @@ export default function AdminCommentsPage() {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      {comment.photoId ? (
-                        <div className="flex items-center space-x-3">
-                          {comment.photoId.imageUrl && (
-                            <div className="flex-shrink-0 h-10 w-10 relative">
+                      {comment.photoId && (
+                        <div className="flex items-center mt-2">
+                          <div className="w-12 h-12 relative mr-2 flex-shrink-0 overflow-hidden rounded">
+                            {typeof comment.photoId !== 'string' && comment.photoId.imageUrl ? (
                               <Image
                                 src={comment.photoId.imageUrl}
                                 alt={getPhotoTitle(comment)}
                                 fill
-                                className="object-cover rounded"
+                                className="object-cover"
+                                sizes="48px"
                               />
-                            </div>
-                          )}
-                          <div className="text-sm text-gray-900">
-                            <button 
-                              onClick={() => handleViewPhotoClick(comment.photoId?._id || '')}
-                              className="text-blue-600 hover:text-blue-800"
+                            ) : (
+                              <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-500">
+                                <span>No img</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-gray-600 truncate">{getPhotoTitle(comment)}</p>
+                            <button
+                              onClick={() => getPhotoId(comment) && handleViewPhotoClick(getPhotoId(comment)!)}
+                              disabled={!getPhotoId(comment)}
+                              className="text-xs text-blue-500 hover:underline disabled:text-gray-400 disabled:no-underline"
                             >
-                              {getPhotoTitle(comment)}
+                              {getPhotoId(comment) ? 'View Photo' : 'No Photo Link'}
                             </button>
                           </div>
                         </div>
-                      ) : (
-                        <div className="text-sm text-gray-500">Unknown</div>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
