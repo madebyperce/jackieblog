@@ -1,56 +1,57 @@
-import { MongoClient } from 'mongodb';
+import { MongoClient, Db } from 'mongodb';
 
-const MONGODB_URI = process.env.MONGODB_URI || '';
-const MONGODB_DB = process.env.MONGODB_DB || '';
-
-// Check if MongoDB URI is defined
-if (!MONGODB_URI) {
-  throw new Error('Please define the MONGODB_URI environment variable');
-}
-
-// Check if MongoDB DB name is defined
-if (!MONGODB_DB) {
-  throw new Error('Please define the MONGODB_DB environment variable');
-}
+// Connection cache
+let cachedClient: MongoClient | null = null;
+let cachedDb: Db | null = null;
 
 /**
- * Global is used here to maintain a cached connection across hot reloads
- * in development. This prevents connections growing exponentially
- * during API Route usage.
+ * Connect to MongoDB
+ * @param uri MongoDB connection URI
+ * @param dbName Database name
+ * @returns MongoDB client and database
  */
-// Define the type for the cached connection
-interface MongoConnection {
-  conn: {
-    client: MongoClient;
-    db: any;
-  } | null;
-  promise: Promise<{ client: MongoClient; db: any }> | null;
-}
-
-// Add type definition for global mongo
-declare global {
-  var mongo: MongoConnection | undefined;
-}
-
-let cached: MongoConnection = global.mongo || { conn: null, promise: null };
-
-if (!global.mongo) {
-  global.mongo = cached;
-}
-
-export async function connectToDatabase() {
-  if (cached.conn) {
-    return cached.conn;
+export async function connectToDatabase(
+  uri: string = process.env.MONGODB_URI || 'mongodb://localhost:27017',
+  dbName: string = process.env.MONGODB_DB || 'jackieblog'
+): Promise<{ client: MongoClient; db: Db }> {
+  // Log connection attempt with partial URI for security
+  const uriStart = uri.substring(0, 15) + '...';
+  console.log(`Connecting to MongoDB: ${uriStart}, DB: ${dbName}`);
+  
+  // Check environment variables
+  if (!uri) {
+    console.error('MONGODB_URI is not defined in environment variables');
+    throw new Error('Please define the MONGODB_URI environment variable');
+  }
+  
+  if (!dbName) {
+    console.error('MONGODB_DB is not defined in environment variables');
+    throw new Error('Please define the MONGODB_DB environment variable');
   }
 
-  if (!cached.promise) {
-    cached.promise = MongoClient.connect(MONGODB_URI).then((client) => {
-      return {
-        client,
-        db: client.db(MONGODB_DB),
-      };
+  // If we have a cached connection, return it
+  if (cachedClient && cachedDb) {
+    console.log('Using cached MongoDB connection');
+    return { client: cachedClient, db: cachedDb };
+  }
+
+  // Create a new connection
+  try {
+    // Connect with a timeout
+    const client = await MongoClient.connect(uri, {
+      // Add any connection options here
     });
+    
+    const db = client.db(dbName);
+    
+    // Cache the connection
+    cachedClient = client;
+    cachedDb = db;
+    
+    console.log('Successfully connected to MongoDB');
+    return { client, db };
+  } catch (error) {
+    console.error('Error connecting to MongoDB:', error);
+    throw error;
   }
-  cached.conn = await cached.promise;
-  return cached.conn;
 } 

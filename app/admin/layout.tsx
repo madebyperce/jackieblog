@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSession, SessionProvider } from 'next-auth/react';
+import { useSession, SessionProvider, signOut } from 'next-auth/react';
 import AdminLogin from '../components/AdminLogin';
 import AdminDashboardLayout from '../components/AdminLayout';
 
@@ -35,6 +35,7 @@ function AdminLayoutContent({
 
   // If not authenticated, show login form
   if (status !== 'authenticated' || !session) {
+    console.log('Not authenticated, showing login form');
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="w-full max-w-sm bg-white rounded-lg shadow-md p-6">
@@ -44,6 +45,28 @@ function AdminLayoutContent({
       </div>
     );
   }
+
+  // Verify admin role
+  const userRole = (session.user as any)?.role;
+  if (userRole !== 'admin') {
+    console.log('User is authenticated but not an admin, role:', userRole);
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="w-full max-w-sm bg-white rounded-lg shadow-md p-6 text-center">
+          <h1 className="text-xl font-bold text-center mb-6">Access Denied</h1>
+          <p className="mb-4">You do not have admin privileges.</p>
+          <button
+            onClick={() => signOut({ callbackUrl: '/admin' })}
+            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+          >
+            Logout
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  console.log('User authenticated as admin, showing admin interface');
 
   // If authenticated, use the AdminDashboardLayout component
   return <AdminDashboardLayout>{children}</AdminDashboardLayout>;

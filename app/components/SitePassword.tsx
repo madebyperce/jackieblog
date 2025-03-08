@@ -1,35 +1,28 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import confetti from 'canvas-confetti';
 import { transformCoordinates } from '../lib/transformCoordinates';
 import { usePathname } from 'next/navigation';
 
-// Utility function to correct coordinates for a collection of photos
-export const correctPhotoCollection = (photos: any[]): any[] => {
-  if (!photos || !Array.isArray(photos)) return photos;
-  
-  return photos.map(photo => {
-    if (photo?.metadata) {
-      // Apply transformation to metadata
-      const correctedMetadata = transformCoordinates(photo.metadata);
-      
-      return {
-        ...photo,
-        metadata: correctedMetadata
-      };
-    }
-    return photo;
-  });
-};
-
+// Remove the test helper function and keep only the essential code
 export default function SitePassword({ children }: { children: React.ReactNode }) {
   // Performance measurement
   const renderStartTime = useRef(Date.now());
+  const childRenderStart = useRef<number | null>(null);
+  
   useEffect(() => {
     const renderTime = Date.now() - renderStartTime.current;
     console.log(`⏱️ SitePassword initial render took ${renderTime}ms`);
+    
+    // Measure children render time if we're authenticated
+    if (childRenderStart.current !== null) {
+      requestAnimationFrame(() => {
+        const childRenderEnd = performance.now();
+        console.log(`⏱️ Children render took ${childRenderEnd - childRenderStart.current!}ms`);
+      });
+    }
     
     // Cleanup excessive logging
     return () => {
@@ -90,8 +83,11 @@ export default function SitePassword({ children }: { children: React.ReactNode }
     
     // Only check site access if we're not in the admin area
     if (!isAdminPath) {
-      // Now check if user should be authenticated
+      // Measure localStorage read performance
+      const localStorageReadStart = performance.now();
       const hasAccess = localStorage.getItem('siteAccess') === 'true';
+      const localStorageReadEnd = performance.now();
+      console.log(`⏱️ localStorage read took ${localStorageReadEnd - localStorageReadStart}ms`);
       
       // Set authentication state
       setIsAuthenticated(hasAccess);
@@ -114,9 +110,28 @@ export default function SitePassword({ children }: { children: React.ReactNode }
     if (password === 'jackie') {
       triggerConfetti();
       
+      console.log(`⏱️ Starting intentional delay of 1000ms at ${Date.now() - submitStartTime}ms`);
+      
       setTimeout(() => {
+        const beforeStateChange = Date.now();
+        console.log(`⏱️ About to change authentication state at ${beforeStateChange - submitStartTime}ms`);
+        
+        // Measure localStorage write performance
+        const localStorageWriteStart = performance.now();
         localStorage.setItem('siteAccess', 'true');
+        const localStorageWriteEnd = performance.now();
+        console.log(`⏱️ localStorage write took ${localStorageWriteEnd - localStorageWriteStart}ms`);
+        
+        // Measure state update performance
+        const stateUpdateStart = performance.now();
+        childRenderStart.current = performance.now(); // Set the child render start time
         setIsAuthenticated(true);
+        
+        // Use requestAnimationFrame to measure when the UI actually updates
+        requestAnimationFrame(() => {
+          const stateUpdateEnd = performance.now();
+          console.log(`⏱️ State update and render took ${stateUpdateEnd - stateUpdateStart}ms`);
+        });
         
         const submitEndTime = Date.now();
         console.log(`⏱️ Password submission and authentication took ${submitEndTime - submitStartTime}ms`);
@@ -137,13 +152,21 @@ export default function SitePassword({ children }: { children: React.ReactNode }
 
   // If authenticated, show children
   if (isAuthenticated) {
+    // If we're rendering children for the first time, set the start time
+    if (childRenderStart.current === null) {
+      childRenderStart.current = performance.now();
+    }
+    
     return <>{children}</>;
   }
 
-  // Otherwise show password form
+  // Otherwise show password form - with performance optimized background
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-800 bg-opacity-75 backdrop-blur-sm">
-      <div className="max-w-md w-full p-6 bg-white rounded-lg shadow-lg">
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Separate background layer without blur for better performance */}
+      <div className="fixed inset-0 bg-gray-800 bg-opacity-75"></div>
+      
+      <div className="relative z-10 max-w-md w-full p-6 bg-white rounded-lg shadow-lg">
         <div className="flex justify-center mb-6">
           <Image 
             src="/header.png" 
@@ -184,7 +207,6 @@ export default function SitePassword({ children }: { children: React.ReactNode }
             </button>
           </div>
         </form>
-        
       </div>
     </div>
   );

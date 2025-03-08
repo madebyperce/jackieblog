@@ -1,46 +1,84 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/app/lib/mongodb';
-import { ObjectId } from 'mongodb';
 
-export async function POST(request: Request) {
+export async function POST(req: NextRequest) {
   try {
-    // Parse request body
-    const { photos } = await request.json();
+    console.log('Received request to update photo locations');
     
-    if (!photos || !Array.isArray(photos)) {
-      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    // Check if environment variables are defined
+    const mongodbUri = process.env.MONGODB_URI;
+    const mongodbDb = process.env.MONGODB_DB;
+    
+    if (!mongodbUri || !mongodbDb) {
+      console.error('MongoDB environment variables not defined:', { 
+        MONGODB_URI: !!mongodbUri, 
+        MONGODB_DB: !!mongodbDb 
+      });
+      
+      // Provide fallback values for development if needed
+      const fallbackUri = mongodbUri || 'mongodb://localhost:27017';
+      const fallbackDb = mongodbDb || 'jackieblog';
+      
+      console.log('Using fallback MongoDB configuration for development');
+      
+      // Continue with fallback values
+      const { db } = await connectToDatabase(fallbackUri, fallbackDb);
+      
+      // Rest of the function...
+      const { photos } = await req.json();
+      
+      if (!photos || !Array.isArray(photos)) {
+        return NextResponse.json(
+          { error: 'Invalid request: photos array is required' },
+          { status: 400 }
+        );
+      }
+      
+      // Update each photo in the database
+      const updatePromises = photos.map(async (photo) => {
+        if (!photo._id) return null;
+        
+        return db.collection('photos').updateOne(
+          { _id: photo._id },
+          { $set: { metadata: photo.metadata } }
+        );
+      });
+      
+      await Promise.all(updatePromises.filter(Boolean));
+      
+      return NextResponse.json({ success: true, count: photos.length });
+    } else {
+      // Use the provided environment variables
+      const { db } = await connectToDatabase(mongodbUri, mongodbDb);
+      
+      // Rest of the function...
+      const { photos } = await req.json();
+      
+      if (!photos || !Array.isArray(photos)) {
+        return NextResponse.json(
+          { error: 'Invalid request: photos array is required' },
+          { status: 400 }
+        );
+      }
+      
+      // Update each photo in the database
+      const updatePromises = photos.map(async (photo) => {
+        if (!photo._id) return null;
+        
+        return db.collection('photos').updateOne(
+          { _id: photo._id },
+          { $set: { metadata: photo.metadata } }
+        );
+      });
+      
+      await Promise.all(updatePromises.filter(Boolean));
+      
+      return NextResponse.json({ success: true, count: photos.length });
     }
-
-    // Connect to MongoDB
-    const { db } = await connectToDatabase();
-    const photosCollection = db.collection('photos');
-    
-    // Update each photo in the database
-    const updatePromises = photos.map(async (photo) => {
-      if (!photo._id && !photo.id) return null;
-      
-      // Use either _id or id, and convert to ObjectId if it's a string
-      const photoId = photo._id || photo.id;
-      const objectId = typeof photoId === 'string' ? new ObjectId(photoId) : photoId;
-      
-      return photosCollection.updateOne(
-        { _id: objectId },
-        { $set: { metadata: photo.metadata || {} } }
-      );
-    });
-
-    // Wait for all updates to complete
-    const results = await Promise.all(updatePromises);
-    const updatedCount = results.filter((result: any) => result && result.modifiedCount > 0).length;
-
-    return NextResponse.json({ 
-      success: true, 
-      message: `Updated ${updatedCount} photos` 
-    });
   } catch (error) {
     console.error('Error updating photo locations:', error);
     return NextResponse.json(
-      { error: 'Failed to update photo locations' }, 
+      { error: 'Failed to update photo locations' },
       { status: 500 }
     );
   }

@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { transformCoordinates } from '@/app/lib/transformCoordinates';
-import { correctPhotoCollection } from '@/app/components/SitePassword';
+import { transformCoordinates, correctPhotoCollection } from '@/app/lib/transformCoordinates';
 import { useSession } from 'next-auth/react';
 
 export default function TransformLocationsPage() {
@@ -51,7 +50,7 @@ export default function TransformLocationsPage() {
       const correctedPhotos = correctPhotoCollection(photos);
       
       // Count how many photos were actually transformed
-      correctedPhotos.forEach((photo, index) => {
+      correctedPhotos.forEach((photo: any, index: number) => {
         if (photo.metadata?.longitude !== photos[index].metadata?.longitude) {
           transformed++;
         }
