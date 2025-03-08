@@ -9,6 +9,7 @@ module.exports = {
     extend: {
       fontFamily: {
         'work-sans': ['var(--font-work-sans)'],
+        'inter': ['var(--font-inter)'],
       },
     },
   },

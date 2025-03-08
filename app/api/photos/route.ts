@@ -67,46 +67,96 @@ function convertDMSToDecimal(dms: string, ref: string): number | undefined {
 
 export async function GET() {
   try {
-    await connectDB();
-    // Make sure Comment model is loaded before using populate
-    await import('@/models/Comment');
-    const photos = (await Photo.find()
-      .populate('comments')
-      .sort({ capturedAt: -1 })
-      .lean()) as unknown as MongoPhoto[];
-
-    // Process photos to ensure dates are properly formatted
-    const processedPhotos = photos.map(photo => {
-      // Convert MongoDB document to a plain object
-      const photoObj = JSON.parse(JSON.stringify(photo));
+    console.log('GET /api/photos: Starting request');
+    
+    // Connect to the database
+    try {
+      console.log('Connecting to MongoDB...');
+      await connectDB();
+      console.log('MongoDB connection successful');
+    } catch (dbError: any) {
+      console.error('MongoDB connection error:', dbError);
+      // Return fallback data instead of failing
+      return NextResponse.json({ 
+        photos: [
+          {
+            _id: 'fallback1',
+            imageUrl: 'https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg',
+            description: 'Fallback image (DB connection failed)',
+            location: 'Database Error',
+            capturedAt: new Date().toISOString(),
+            metadata: { }
+          }
+        ],
+        warning: 'Database connection failed, showing fallback data'
+      });
+    }
+    
+    // Fetch photos from MongoDB
+    try {
+      console.log('Fetching photos from database...');
+      const photos = await Photo.find({})
+        .sort({ capturedAt: -1 })
+        .populate({
+          path: 'comments',
+          model: Comment,
+          options: { sort: { createdAt: -1 } }
+        })
+        .lean();
       
-      // Ensure dates and location data are properly formatted
-      const processedPhoto = {
-        ...photoObj,
+      console.log(`Found ${photos.length} photos in database`);
+      
+      // Transform MongoDB documents to plain objects
+      const transformedPhotos = photos.map((photo: any) => ({
         _id: photo._id.toString(),
-        capturedAt: photo.capturedAt ? new Date(photo.capturedAt).toISOString() : undefined,
-        createdAt: photo.createdAt ? new Date(photo.createdAt).toISOString() : new Date().toISOString(),
+        imageUrl: photo.imageUrl,
+        description: photo.description,
         location: photo.location,
-        metadata: {
-          ...photo.metadata,
-          coordinates: photo.metadata?.latitude && photo.metadata?.longitude
-            ? `${photo.metadata.latitude},${photo.metadata.longitude}`
-            : null
-        },
-        comments: photo.comments?.map((comment: MongoComment) => ({
-          ...comment,
+        capturedAt: photo.capturedAt instanceof Date ? photo.capturedAt.toISOString() : photo.capturedAt,
+        metadata: photo.metadata,
+        comments: photo.comments ? photo.comments.map((comment: any) => ({
           _id: comment._id.toString(),
-          createdAt: comment.createdAt ? new Date(comment.createdAt).toISOString() : new Date().toISOString()
-        })) || []
-      };
+          content: comment.content,
+          authorName: comment.authorName,
+          createdAt: comment.createdAt instanceof Date ? comment.createdAt.toISOString() : comment.createdAt
+        })) : []
+      }));
 
-      return processedPhoto;
+      return NextResponse.json({ photos: transformedPhotos });
+    } catch (queryError: any) {
+      console.error('Error querying photos:', queryError);
+      // Return fallback data instead of failing
+      return NextResponse.json({ 
+        photos: [
+          {
+            _id: 'fallback2',
+            imageUrl: 'https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg',
+            description: 'Fallback image (Query failed)',
+            location: 'Query Error',
+            capturedAt: new Date().toISOString(),
+            metadata: { }
+          }
+        ],
+        warning: 'Database query failed, showing fallback data'
+      });
+    }
+  } catch (error: any) {
+    console.error('Unhandled error in GET /api/photos:', error);
+    // Return fallback data for any other errors
+    return NextResponse.json({ 
+      photos: [
+        {
+          _id: 'fallback3',
+          imageUrl: 'https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg',
+          description: 'Fallback image (Server error)',
+          location: 'Server Error',
+          capturedAt: new Date().toISOString(),
+          metadata: { }
+        }
+      ],
+      error: 'Failed to fetch photos',
+      details: error.message
     });
-
-    return NextResponse.json(processedPhotos);
-  } catch (error) {
-    console.error('Error fetching photos:', error);
-    return NextResponse.json({ error: 'Error fetching photos' }, { status: 500 });
   }
 }
 

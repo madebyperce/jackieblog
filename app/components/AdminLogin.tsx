@@ -2,20 +2,15 @@
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { signIn, signOut, useSession } from 'next-auth/react';
-import { useRouter, usePathname } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 
 interface LoginForm {
   password: string;
 }
 
 export default function AdminLogin() {
-  const { data: session } = useSession();
   const { register, handleSubmit, setError, formState: { errors } } = useForm<LoginForm>();
   const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
-  const pathname = usePathname();
-  const isAdminPage = pathname === '/admin';
 
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
@@ -23,6 +18,7 @@ export default function AdminLogin() {
       const result = await signIn('credentials', {
         password: data.password,
         redirect: false,
+        callbackUrl: '/admin'
       });
 
       if (result?.error) {
@@ -30,52 +26,29 @@ export default function AdminLogin() {
           type: 'manual',
           message: 'Invalid password',
         });
-      } else if (!isAdminPage) {
-        router.push('/admin');
       } else {
-        router.refresh();
+        window.location.href = '/admin';
       }
     } catch (error) {
-      console.error('Login error:', error);
       setError('password', {
         type: 'manual',
-        message: 'An error occurred during login',
+        message: 'An error occurred',
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (session?.user) {
-    return (
-      <div className="flex justify-between items-center bg-green-100 p-4 rounded-lg">
-        <span className="text-green-800">Logged in as admin</span>
-        <button
-          onClick={async () => {
-            await signOut({ redirect: false });
-            if (isAdminPage) {
-              router.push('/');
-            } else {
-              router.refresh();
-            }
-          }}
-          className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition"
-        >
-          Logout
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <div>
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <div className="mb-4">
         <input
           type="password"
           {...register('password', { required: 'Password is required' })}
-          placeholder="Enter admin password"
-          className="w-full p-2 border rounded"
+          placeholder="Admin password"
+          className="w-full p-2 border rounded focus:border-blue-500 focus:ring focus:ring-blue-200"
           autoComplete="current-password"
+          autoFocus
         />
         {errors.password && (
           <p className="text-red-500 text-sm mt-1">{errors.password.message}</p>
@@ -84,9 +57,9 @@ export default function AdminLogin() {
       <button
         type="submit"
         disabled={isLoading}
-        className="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition disabled:opacity-50"
+        className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition disabled:opacity-50"
       >
-        {isLoading ? 'Logging in...' : 'Login as Admin'}
+        {isLoading ? 'Logging in...' : 'Login'}
       </button>
     </form>
   );

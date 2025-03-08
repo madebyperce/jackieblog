@@ -1,3 +1,18 @@
+/**
+ * PhotoGallery Component
+ * 
+ * This component displays a gallery of photos with two view modes (grid and thumbnail)
+ * and pagination. Unlike PhotoGrid, this component:
+ * 
+ * 1. Receives photos as props rather than fetching them directly
+ * 2. Provides navigation to individual photo pages via Next.js Link
+ * 3. Has a simpler UI without comments functionality
+ * 4. Is designed to be used as a sub-component in other pages
+ * 
+ * @deprecated Consider using the unified PhotoDisplay component instead,
+ * which combines functionality from both PhotoGrid and PhotoGallery.
+ */
+
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -5,6 +20,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import Pagination from './Pagination';
 
+/**
+ * Photo interface representing the structure of a photo object
+ */
 interface Photo {
   _id: string;
   imageUrl: string;
@@ -17,31 +35,49 @@ interface Photo {
   };
 }
 
+/**
+ * Props for the PhotoGallery component
+ */
 interface PhotoGalleryProps {
+  /** Array of photos to display */
   photos: Photo[];
+  /** Number of photos to display per page in grid view */
   itemsPerPage?: number;
 }
 
+/**
+ * PhotoGallery component for displaying photos with grid/thumbnail views
+ * and pagination
+ */
 export default function PhotoGallery({ photos, itemsPerPage = 9 }: PhotoGalleryProps) {
+  // Reference to the top of the gallery for scrolling
   const topRef = useRef<HTMLDivElement>(null);
+  // Current page for pagination
   const [currentPage, setCurrentPage] = useState(1);
+  // Current view mode (grid or thumbnail)
   const [viewMode, setViewMode] = useState<'grid' | 'thumbnail'>('grid');
   
+  // Calculate total pages for pagination
   const totalPages = Math.ceil(photos.length / itemsPerPage);
   
-  // Get current photos for pagination in grid mode
+  /**
+   * Get current photos for pagination in grid mode
+   * In thumbnail mode, show all photos
+   */
   const indexOfLastPhoto = currentPage * itemsPerPage;
   const indexOfFirstPhoto = indexOfLastPhoto - itemsPerPage;
   const currentPhotos = viewMode === 'grid' 
     ? photos.slice(indexOfFirstPhoto, indexOfLastPhoto) 
-    : photos; // In thumbnail mode, show all photos
+    : photos;
   
-  // Scroll to top when page changes
+  /**
+   * Scroll to top when page changes
+   */
   useEffect(() => {
     const scrollToTop = () => {
       window.scrollTo(0, 0);
       document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
+      document.body.scrollTop = 0; // For Safari
     };
     
     scrollToTop();
@@ -49,11 +85,18 @@ export default function PhotoGallery({ photos, itemsPerPage = 9 }: PhotoGalleryP
     return () => clearTimeout(timeoutId);
   }, [currentPage]);
   
+  /**
+   * Handle page change in pagination
+   * @param pageNumber - New page number
+   */
   const handlePageChange = (pageNumber: number) => {
     console.log('Page change to:', pageNumber);
     setCurrentPage(pageNumber);
   };
   
+  /**
+   * Toggle between grid and thumbnail view modes
+   */
   const handleViewModeToggle = () => {
     const newMode = viewMode === 'grid' ? 'thumbnail' : 'grid';
     console.log('Toggling view mode from', viewMode, 'to', newMode);
@@ -117,7 +160,7 @@ export default function PhotoGallery({ photos, itemsPerPage = 9 }: PhotoGalleryP
           ))}
         </div>
         
-        {/* Only render pagination in grid mode - no else clause */}
+        {/* Only render pagination in grid mode */}
         {showPagination && (
           <div className="mt-8">
             <Pagination

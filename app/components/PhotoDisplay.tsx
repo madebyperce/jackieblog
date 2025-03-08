@@ -1,29 +1,26 @@
 /**
- * PhotoGrid Component
+ * PhotoDisplay Component
  * 
- * This component displays a grid of photos with comments functionality.
- * It fetches photos directly from the API and provides a grid/thumbnail toggle view.
+ * A unified, flexible component for displaying photos that combines functionality
+ * from both PhotoGrid and PhotoGallery components.
  * 
- * @deprecated Consider using the unified PhotoDisplay component instead,
- * which combines functionality from both PhotoGrid and PhotoGallery.
- * 
- * Key features:
- * - Self-fetching photos from API
- * - Grid and thumbnail view modes
- * - Comments functionality
- * - Pagination
+ * Features:
+ * - Multiple view modes (grid, thumbnails)
+ * - Optional comments section
+ * - Can fetch photos itself or receive them as props
+ * - Pagination support
+ * - Detailed or simplified photo display
  */
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { useForm } from 'react-hook-form';
-import Map from './Map';
-import { MapPinIcon } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
-import CommentSection from './CommentSection';
 import Pagination from './Pagination';
+import CommentSection from './CommentSection';
+import { transformCoordinates } from '@/app/lib/transformCoordinates';
 
 /**
  * Photo interface representing the structure of a photo object
@@ -41,7 +38,7 @@ interface Photo {
     location?: string;
     coordinates?: string;
   };
-  comments: Array<{
+  comments?: Array<{
     _id: string;
     content: string;
     authorName: string;
@@ -52,19 +49,25 @@ interface Photo {
 /**
  * Comment form data structure
  */
-interface Comment {
-  _id: string;
-  content: string;
-  authorName: string;
-  createdAt: string;
-}
-
-/**
- * Comment form data structure
- */
 interface CommentForm {
   content: string;
   authorName: string;
+}
+
+/**
+ * Props for the PhotoDisplay component
+ */
+interface PhotoDisplayProps {
+  /** Photos to display. If not provided, component will fetch photos itself */
+  photos?: Photo[];
+  /** Number of photos to display per page */
+  itemsPerPage?: number;
+  /** Whether to show the comments section */
+  showComments?: boolean;
+  /** Initial view mode */
+  initialViewMode?: 'grid' | 'thumbnails';
+  /** Whether to fetch photos from API (if photos prop not provided) */
+  fetchPhotos?: boolean;
 }
 
 /**
@@ -101,16 +104,45 @@ function formatDate(dateString: string) {
   }
 }
 
-export default function PhotoGrid() {
+// Helper function to get corrected coordinates for Google Maps
+function getCorrectCoordinates(metadata: any) {
+  if (!metadata) return '';
+  
+  // If we have coordinates string, parse it and correct
+  if (metadata.coordinates) {
+    const [lat, lng] = metadata.coordinates.split(',').map(parseFloat);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      const correctedMetadata = transformCoordinates({ latitude: lat, longitude: lng });
+      return `${correctedMetadata.latitude},${correctedMetadata.longitude}`;
+    }
+    return metadata.coordinates;
+  }
+  
+  // If we have separate latitude and longitude
+  if (metadata.latitude !== undefined && metadata.longitude !== undefined) {
+    const correctedMetadata = transformCoordinates(metadata);
+    return `${correctedMetadata.latitude},${correctedMetadata.longitude}`;
+  }
+  
+  return '';
+}
+
+export default function PhotoDisplay({
+  photos: propPhotos,
+  itemsPerPage = 10,
+  showComments = false,
+  initialViewMode = 'grid',
+  fetchPhotos = false
+}: PhotoDisplayProps) {
   // State variables
-  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [photos, setPhotos] = useState<Photo[]>(propPhotos || []);
   const [error, setError] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [view, setView] = useState<'grid' | 'thumbnails'>('grid');
+  const [isLoading, setIsLoading] = useState(fetchPhotos && !propPhotos);
+  const [view, setView] = useState<'grid' | 'thumbnails'>(initialViewMode);
   const [expandedComments, setExpandedComments] = useState<{ [key: string]: boolean }>({});
   const [currentPage, setCurrentPage] = useState(1);
-  const photosPerPage = 10;
   const { register, handleSubmit, reset } = useForm<CommentForm>();
+  const topRef = useRef<HTMLDivElement>(null);
 
   /**
    * Preloads image thumbnails for better user experience
@@ -133,7 +165,7 @@ export default function PhotoGrid() {
     if (!Array.isArray(photos)) return 1;
     const photoIndex = photos.findIndex(p => p._id === photoId);
     if (photoIndex === -1) return 1;
-    return Math.floor(photoIndex / photosPerPage) + 1;
+    return Math.floor(photoIndex / itemsPerPage) + 1;
   };
 
   /**
@@ -154,16 +186,9 @@ export default function PhotoGrid() {
   };
 
   /**
-   * Fetches photos from the API on component mount
-   */
-  useEffect(() => {
-    fetchPhotos();
-  }, []);
-
-  /**
    * Fetches photos from the API
    */
-  const fetchPhotos = async () => {
+  const fetchPhotosFromAPI = async () => {
     try {
       setIsLoading(true);
       const response = await fetch('/api/photos');
@@ -183,24 +208,6 @@ export default function PhotoGrid() {
       } else {
         console.error('Unexpected API response format:', data);
         photosArray = [];
-      }
-      
-      // Log detailed information about the first photo
-      if (photosArray.length > 0) {
-        console.log('First photo data:', {
-          _id: photosArray[0]._id,
-          dates: {
-            capturedAt: photosArray[0].capturedAt,
-            createdAt: photosArray[0].createdAt
-          },
-          location: {
-            userProvided: photosArray[0].location,
-            hasMetadata: Boolean(photosArray[0].metadata),
-            coordinates: photosArray[0].metadata?.coordinates,
-            latitude: photosArray[0].metadata?.latitude,
-            longitude: photosArray[0].metadata?.longitude
-          }
-        });
       }
       
       setPhotos(photosArray);
@@ -233,7 +240,11 @@ export default function PhotoGrid() {
       }
 
       reset();
-      await fetchPhotos(); // Refresh photos to show new comment
+      
+      // Refresh photos to show new comment
+      if (fetchPhotos) {
+        await fetchPhotosFromAPI();
+      }
     } catch (error) {
       console.error('Error posting comment:', error);
     }
@@ -249,23 +260,6 @@ export default function PhotoGrid() {
       [photoId]: !prev[photoId]
     }));
   };
-
-  // Get current photos for pagination
-  const indexOfLastPhoto = currentPage * photosPerPage;
-  const indexOfFirstPhoto = indexOfLastPhoto - photosPerPage;
-  // Ensure photos is an array before calling slice
-  const currentPhotos = Array.isArray(photos) 
-    ? photos.slice(indexOfFirstPhoto, indexOfLastPhoto)
-    : [];
-  // Fix the parentheses in the totalPages calculation
-  const totalPages = Math.ceil(Array.isArray(photos) ? photos.length / photosPerPage : 0);
-
-  /**
-   * Logs view mode changes (for debugging)
-   */
-  useEffect(() => {
-    console.log('View mode changed:', view);
-  }, [view]);
 
   /**
    * Handles page changes with smooth scrolling
@@ -296,23 +290,57 @@ export default function PhotoGrid() {
     }, 100);
   };
 
+  /**
+   * Toggles between grid and thumbnail view modes
+   */
+  const handleViewModeToggle = () => {
+    setView(view === 'grid' ? 'thumbnails' : 'grid');
+    
+    // Reset to first page when switching to grid view
+    if (view === 'thumbnails') {
+      setCurrentPage(1);
+    }
+  };
+
+  // Fetch photos on component mount if needed
+  useEffect(() => {
+    if (fetchPhotos && !propPhotos) {
+      fetchPhotosFromAPI();
+    }
+  }, [fetchPhotos, propPhotos]);
+
+  // Get current photos for pagination
+  const indexOfLastPhoto = currentPage * itemsPerPage;
+  const indexOfFirstPhoto = indexOfLastPhoto - itemsPerPage;
+  // Ensure photos is an array before calling slice
+  const currentPhotos = Array.isArray(photos) 
+    ? (view === 'grid' ? photos.slice(indexOfFirstPhoto, indexOfLastPhoto) : photos)
+    : [];
+  // Calculate total pages
+  const totalPages = Math.ceil(Array.isArray(photos) ? photos.length / itemsPerPage : 0);
+
+  // Loading state
   if (isLoading) {
     return <div className="text-center">Loading photos...</div>;
   }
 
+  // Error state
   if (error) {
     return <div className="text-red-500 text-center">{error}</div>;
   }
 
+  // Empty state
   if (!Array.isArray(photos) || photos.length === 0) {
     return <div className="text-gray-500 text-center">No photos yet</div>;
   }
 
   return (
     <div className="container mx-auto px-4 pt-2 pb-8">
+      <div ref={topRef} id="gallery-top"></div>
+      
       <div className="flex justify-center mb-8">
         <button
-          onClick={() => setView(view === 'grid' ? 'thumbnails' : 'grid')}
+          onClick={handleViewModeToggle}
           className="text-[11px] text-gray-400 px-3 py-1.5 rounded italic hover:text-gray-600 transition-colors duration-200"
         >
           {view === 'grid' ? 'show thumbnails' : 'show full size'}
@@ -365,7 +393,7 @@ export default function PhotoGrid() {
                   {photo.metadata?.coordinates && (
                     <>
                       <a
-                        href={`https://www.google.com/maps/search/?api=1&query=${photo.metadata.coordinates}`}
+                        href={`https://www.google.com/maps/search/?api=1&query=${getCorrectCoordinates(photo.metadata)}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         title="Open map"
@@ -380,7 +408,10 @@ export default function PhotoGrid() {
                     {format(new Date(photo.capturedAt), 'MMM d, yyyy')}
                   </span>
                 </div>
-                <CommentSection photo={photo} />
+                
+                {showComments && photo.comments && (
+                  <CommentSection photo={photo} />
+                )}
               </div>
             </div>
           ))}
