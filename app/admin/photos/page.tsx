@@ -102,11 +102,22 @@ export default function AdminPhotosPage() {
   const [editLocation, setEditLocation] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   
+  // Add state for upload modal
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  
+  // Add state for upload form
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadDescription, setUploadDescription] = useState('');
+  const [uploadLocation, setUploadLocation] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  
   // Increased items per page since we're showing smaller photos
   const itemsPerPage = 24;
   
   // Fetch photos on component mount
   useEffect(() => {
+    console.log('AdminPhotosPage component mounted');
     const getPhotos = async () => {
       setLoading(true);
       try {
@@ -239,6 +250,104 @@ export default function AdminPhotosPage() {
     window.open(imageUrl, '_blank');
   };
 
+  // Handle upload button click
+  const handleUploadClick = () => {
+    console.log('Upload button clicked');
+    setShowUploadModal(true);
+  };
+
+  // Handle file change
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      console.log('File selected:', {
+        name: file.name,
+        type: file.type,
+        size: file.size
+      });
+      setUploadFile(file);
+    }
+  };
+  
+  // Handle upload form submission
+  const handleUploadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!uploadFile) {
+      setUploadError('Please select a file to upload');
+      return;
+    }
+    
+    setIsUploading(true);
+    setUploadError(null);
+    
+    try {
+      console.log('Starting upload process');
+      
+      // Create form data
+      const formData = new FormData();
+      formData.append('image', uploadFile);
+      formData.append('description', uploadDescription);
+      formData.append('location', uploadLocation);
+      
+      console.log('Form data created:', {
+        hasFile: !!uploadFile,
+        fileType: uploadFile.type,
+        fileSize: uploadFile.size,
+        description: uploadDescription,
+        location: uploadLocation
+      });
+      
+      // Send request to API
+      const response = await fetch('/api/photos', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      console.log('API response status:', response.status);
+      
+      // Parse response
+      let responseText;
+      let responseData;
+      
+      try {
+        responseText = await response.text();
+        console.log('API response text:', responseText);
+        
+        try {
+          responseData = JSON.parse(responseText);
+          console.log('API response data:', responseData);
+        } catch (parseError) {
+          console.error('Failed to parse response as JSON:', parseError);
+        }
+      } catch (textError) {
+        console.error('Failed to get response text:', textError);
+      }
+      
+      if (response.ok) {
+        console.log('Upload successful');
+        
+        // Reset form
+        setUploadFile(null);
+        setUploadDescription('');
+        setUploadLocation('');
+        setShowUploadModal(false);
+        
+        // Refresh photos
+        const newPhotos = await fetchPhotos();
+        setPhotos(newPhotos);
+      } else {
+        console.error('Upload failed:', responseData?.error || 'Unknown error');
+        setUploadError(responseData?.error || 'Failed to upload photo');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      setUploadError('An error occurred while uploading the photo');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   return (
     <>
       <h1 className="text-lg font-medium mb-4">Manage Photos</h1>
@@ -246,7 +355,10 @@ export default function AdminPhotosPage() {
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <div>
-            <button className="bg-blue-600 text-white px-3 py-1.5 text-xs rounded-md hover:bg-blue-700">
+            <button 
+              className="bg-blue-600 text-white px-3 py-1.5 text-xs rounded-md hover:bg-blue-700"
+              onClick={handleUploadClick}
+            >
               Upload New Photo
             </button>
           </div>
@@ -376,6 +488,75 @@ export default function AdminPhotosPage() {
               totalPages={totalPages}
               onPageChange={handlePageChange}
             />
+          </div>
+        )}
+        
+        {/* Upload Modal */}
+        {showUploadModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg max-w-md w-full">
+              <h2 className="text-lg font-medium mb-4">Upload New Photo</h2>
+              
+              <form onSubmit={handleUploadSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Photo</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="w-full p-2 border rounded text-sm"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <input
+                    type="text"
+                    value={uploadDescription}
+                    onChange={(e) => setUploadDescription(e.target.value)}
+                    className="w-full p-2 border rounded"
+                    placeholder="Enter photo description"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                  <input
+                    type="text"
+                    value={uploadLocation}
+                    onChange={(e) => setUploadLocation(e.target.value)}
+                    className="w-full p-2 border rounded"
+                    placeholder="Enter photo location"
+                    required
+                  />
+                </div>
+                
+                {uploadError && (
+                  <div className="p-3 bg-red-100 text-red-700 rounded">
+                    {uploadError}
+                  </div>
+                )}
+                
+                <div className="flex justify-end space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowUploadModal(false)}
+                    className="px-4 py-2 border border-gray-300 rounded text-sm"
+                    disabled={isUploading}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded text-sm"
+                    disabled={isUploading}
+                  >
+                    {isUploading ? 'Uploading...' : 'Upload'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
       </div>

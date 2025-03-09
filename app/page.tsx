@@ -1,4 +1,5 @@
 import PhotoDisplay from './components/PhotoDisplay';
+import { Analytics } from "@vercel/analytics/react";
 
 export default function Home() {
   return (
