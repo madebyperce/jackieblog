@@ -122,7 +122,7 @@ export default function PhotoGallery({ photos, itemsPerPage = 9 }: PhotoGalleryP
           <h2 className="text-2xl font-bold">Photo Gallery</h2>
           <button
             onClick={handleViewModeToggle}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            className="px-4 py-2 bg-[#8bac98] text-white rounded hover:bg-[#7a9a87]"
             type="button"
           >
             {viewMode === 'grid' ? 'Show Thumbnails' : 'Show Grid'}

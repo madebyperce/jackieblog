@@ -7,6 +7,10 @@ import { NextAuthProvider } from '@/app/providers';
 import SitePassword from './components/SitePassword';
 import SparkleEffect from './components/SparkleEffect';
 import Header from './components/Header';
+import dynamic from 'next/dynamic';
+
+// Dynamically import the ScrollToTop component with no SSR
+const ScrollToTop = dynamic(() => import('./components/ScrollToTop'), { ssr: false });
 
 // Initialize the font outside the component
 const inter = Inter({ 
@@ -15,6 +19,13 @@ const inter = Inter({
   variable: '--font-inter',
 });
 
+export const metadata: Metadata = {
+  title: "Jackie's Adventures",
+  description: "perce made a website for her dog",
+  icons: {
+    icon: '/favicon.ico',
+  },
+};
 
 export default function RootLayout({
   children,
@@ -39,6 +50,7 @@ export default function RootLayout({
               <div className="min-h-screen bg-gray-50">
                 <Header />
                 <main>{children}</main>
+                <ScrollToTop />
               </div>
             </SitePassword>
           )}

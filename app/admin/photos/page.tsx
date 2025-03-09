@@ -356,7 +356,7 @@ export default function AdminPhotosPage() {
         <div className="flex justify-between items-center">
           <div>
             <button 
-              className="bg-blue-600 text-white px-3 py-1.5 text-xs rounded-md hover:bg-blue-700"
+              className="bg-[#8bac98] text-white px-3 py-1.5 text-xs rounded-md hover:bg-[#7a9a87]"
               onClick={handleUploadClick}
             >
               Upload New Photo
@@ -447,7 +447,7 @@ export default function AdminPhotosPage() {
                         </button>
                         <button
                           onClick={() => handleSaveEdit(photo._id)}
-                          className="px-1.5 py-0.5 bg-blue-600 text-white rounded text-xs"
+                          className="px-1.5 py-0.5 bg-[#8bac98] text-white rounded text-xs"
                           disabled={isSaving}
                         >
                           {isSaving ? 'Saving...' : 'Save'}
@@ -461,7 +461,7 @@ export default function AdminPhotosPage() {
                       <p className="text-xs text-gray-500 truncate" title={photo.location}>{photo.location}</p>
                       <div className="mt-1 flex space-x-2">
                         <button 
-                          className="text-blue-600 hover:text-blue-800 text-xs"
+                          className="text-[#8bac98] hover:text-[#7a9a87] text-xs"
                           onClick={() => handleEditClick(photo)}
                         >
                           Edit
@@ -549,7 +549,7 @@ export default function AdminPhotosPage() {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded text-sm"
+                    className="px-4 py-2 bg-[#8bac98] text-white rounded text-sm"
                     disabled={isUploading}
                   >
                     {isUploading ? 'Uploading...' : 'Upload'}

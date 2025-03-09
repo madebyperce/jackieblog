@@ -38,59 +38,129 @@ export default function CommentSection({ photo, onSubmitComment }: CommentSectio
   const commentCount = comments.length;
 
   const triggerSparkle = (e: React.MouseEvent<HTMLButtonElement>) => {
+    console.log('triggerSparkle called', e.currentTarget);
     const button = e.currentTarget;
     const rect = button.getBoundingClientRect();
     const buttonCenterX = rect.left + rect.width / 2;
     const buttonCenterY = rect.top + rect.height / 2;
 
-    confetti({
-      particleCount: 50,
-      spread: 90,
-      origin: {
-        x: buttonCenterX / window.innerWidth,
-        y: buttonCenterY / window.innerHeight
-      },
-      colors: ['#FFD700', '#FFA500', '#FF69B4', '#87CEEB', '#9B59B6'],
-      gravity: 3,
-      scalar: 0.8,
-      shapes: ['star'],
-      ticks: 100
+    console.log('Button position:', {
+      rect,
+      buttonCenterX,
+      buttonCenterY,
+      windowWidth: window.innerWidth,
+      windowHeight: window.innerHeight,
+      originX: buttonCenterX / window.innerWidth,
+      originY: buttonCenterY / window.innerHeight
     });
+
+    try {
+      confetti({
+        particleCount: 50,
+        spread: 90,
+        origin: {
+          x: buttonCenterX / window.innerWidth,
+          y: buttonCenterY / window.innerHeight
+        },
+        colors: ['#8bac98', '#e96440', '#deb365', '#2c3e50', '#b0807a'],
+        gravity: 3,
+        scalar: 0.8,
+        shapes: ['star'],
+        ticks: 100
+      });
+      console.log('Confetti triggered successfully');
+    } catch (error) {
+      console.error('Error triggering confetti:', error);
+    }
   };
 
   const onSubmit = async (data: CommentForm) => {
-    if (isSubmitting) return;
-    
+    console.log('Comment submission started', data);
     setIsSubmitting(true);
+    
     try {
-      // If onSubmitComment prop is provided, use it
+      let shouldReloadPage = true;
+      
+      // If a custom submit handler is provided, use it
       if (onSubmitComment) {
+        console.log('Using custom submit handler');
         await onSubmitComment(data);
         reset();
-        return;
+        // Don't return early, continue to trigger confetti
+        shouldReloadPage = false; // Assume custom handler manages page state
+      } else {
+        console.log('Using default submit handler');
+        // Otherwise use the default implementation
+        const response = await fetch(`/api/photos/${photo._id}/comments`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data),
+        });
+
+        console.log('API response:', {
+          status: response.status,
+          ok: response.ok
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to post comment');
+        }
+
+        // Reset form
+        reset();
       }
       
-      // Otherwise use the default implementation
-      const response = await fetch(`/api/photos/${photo._id}/comments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to post comment');
-      }
-
-      // Reset form and refresh
-      reset();
-      window.location.reload();
-      
-      // Trigger sparkle effect on the submit button
+      // Trigger sparkle effect regardless of which handler was used
+      console.log('Looking for submit button to trigger sparkle');
       const submitButton = document.querySelector('button[type="submit"]');
+      console.log('Submit button found:', submitButton);
+      
       if (submitButton) {
-        triggerSparkle({ currentTarget: submitButton } as React.MouseEvent<HTMLButtonElement>);
+        console.log('Attempting to trigger sparkle effect');
+        // Add a small delay to ensure DOM has updated
+        setTimeout(() => {
+          try {
+            triggerSparkle({ currentTarget: submitButton } as React.MouseEvent<HTMLButtonElement>);
+          } catch (error) {
+            console.error('Error in triggerSparkle:', error);
+            
+            // Fallback: try direct confetti call
+            console.log('Trying direct confetti call as fallback');
+            try {
+              confetti({
+                particleCount: 50,
+                spread: 90,
+                origin: { x: 0.5, y: 0.5 }, // Center of screen
+                colors: ['#8bac98', '#e96440', '#deb365', '#2c3e50', '#b0807a'],
+                gravity: 3,
+                scalar: 0.8,
+                shapes: ['star'],
+                ticks: 100
+              });
+              console.log('Direct confetti call successful');
+            } catch (confettiError) {
+              console.error('Error in direct confetti call:', confettiError);
+            }
+          }
+        }, 100);
+        
+        // Only reload the page if using the default handler
+        if (shouldReloadPage) {
+          // Add a delay before reloading the page to allow confetti to render
+          console.log('Delaying page reload to allow confetti to render');
+          setTimeout(() => {
+            console.log('Reloading page');
+            window.location.reload();
+          }, 1000); // 1 second delay
+        }
+      } else {
+        console.log('Submit button not found');
+        // Only reload if using default handler and button not found
+        if (shouldReloadPage) {
+          window.location.reload();
+        }
       }
     } catch (error) {
       console.error('Error posting comment:', error);
@@ -174,7 +244,7 @@ export default function CommentSection({ photo, onSubmitComment }: CommentSectio
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-blue-300"
+              className="px-3 py-1 text-xs bg-[#8bac98] text-white rounded hover:bg-[#7a9a87] disabled:bg-[#c5d6cc]"
             >
               {isSubmitting ? 'Posting...' : 'Post Comment'}
             </button>

@@ -40,7 +40,7 @@ export default function Pagination({
             onClick={() => onPageChange(page)}
             className={`px-4 py-2 text-sm font-medium ${
               currentPage === page
-                ? 'text-blue-600 bg-blue-50'
+                ? 'text-[#8bac98] bg-[#f0f5f2]'
                 : 'text-gray-700 bg-white hover:bg-gray-50'
             }`}
           >

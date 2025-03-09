@@ -33,7 +33,7 @@ export default function SparkleEffect() {
         particleCount: 3,
         spread: 70,
         origin: { x, y },
-        colors: ['#FFD700', '#FF69B4', '#87CEEB'],
+        colors: ['#8bac98', '#e96440', '#deb365'],
         gravity: 2,
         scalar: 0.7,
         shapes: ['star'],

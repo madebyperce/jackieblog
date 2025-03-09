@@ -191,7 +191,7 @@ export default function PhotoUpload() {
         <button
           type="submit"
           disabled={isUploading}
-          className="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full bg-[#8bac98] text-white py-2 px-4 rounded hover:bg-[#7a9a87] transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isUploading ? 'Uploading...' : 'Upload Photo'}
         </button>

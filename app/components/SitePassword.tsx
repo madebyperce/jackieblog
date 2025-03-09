@@ -66,7 +66,7 @@ export default function SitePassword({ children }: { children: React.ReactNode }
         x: buttonCenterX / window.innerWidth,
         y: buttonCenterY / window.innerHeight
       },
-      colors: ['#FFD700', '#FFA500', '#FF69B4', '#87CEEB', '#9B59B6'],
+      colors: ['#8bac98', '#e96440', '#deb365', '#2c3e50', '#b0807a'],
       gravity: 3,
       scalar: 0.8,
       shapes: ['star'],
@@ -201,7 +201,7 @@ export default function SitePassword({ children }: { children: React.ReactNode }
             <button
               ref={buttonRef}
               type="submit"
-              className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+              className="px-3 py-1 text-xs bg-[#8bac98] text-white rounded hover:bg-[#7a9a87]"
             >
               Enter Site
             </button>

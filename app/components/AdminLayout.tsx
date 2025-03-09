@@ -24,7 +24,7 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Top navigation bar */}
-      <header className="bg-blue-800 text-white shadow-md">
+      <header className="bg-[#8bac98] text-white shadow-md">
         <div className="container mx-auto px-4 py-3 flex justify-between items-center">
           <h1 className="text-xl font-bold">Admin</h1>
           <button
@@ -45,10 +45,10 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
             <li>
               <Link 
                 href="/admin" 
-                className={`px-4 py-3 inline-block hover:bg-blue-50 border-b-2 ${
+                className={`px-4 py-3 inline-block hover:bg-[#f0f5f2] border-b-2 ${
                   isActive('/admin')
-                    ? 'border-blue-500 text-blue-600' 
-                    : 'border-transparent hover:border-blue-500'
+                    ? 'border-[#8bac98] text-[#8bac98]' 
+                    : 'border-transparent hover:border-[#8bac98]'
                 } transition`}
               >
                 Dashboard
@@ -57,10 +57,10 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
             <li>
               <Link 
                 href="/admin/photos" 
-                className={`px-4 py-3 inline-block hover:bg-blue-50 border-b-2 ${
-                  isActive('/admin/photos') 
-                    ? 'border-blue-500 text-blue-600' 
-                    : 'border-transparent hover:border-blue-500'
+                className={`px-4 py-3 inline-block hover:bg-[#f0f5f2] border-b-2 ${
+                  isActive('/admin/photos')
+                    ? 'border-[#8bac98] text-[#8bac98]' 
+                    : 'border-transparent hover:border-[#8bac98]'
                 } transition`}
               >
                 Photos
@@ -69,10 +69,10 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
             <li>
               <Link 
                 href="/admin/comments" 
-                className={`px-4 py-3 inline-block hover:bg-blue-50 border-b-2 ${
-                  isActive('/admin/comments') 
-                    ? 'border-blue-500 text-blue-600' 
-                    : 'border-transparent hover:border-blue-500'
+                className={`px-4 py-3 inline-block hover:bg-[#f0f5f2] border-b-2 ${
+                  isActive('/admin/comments')
+                    ? 'border-[#8bac98] text-[#8bac98]' 
+                    : 'border-transparent hover:border-[#8bac98]'
                 } transition`}
               >
                 Comments
@@ -81,13 +81,25 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
             <li>
               <Link 
                 href="/admin/transform-locations" 
-                className={`px-4 py-3 inline-block hover:bg-blue-50 border-b-2 ${
-                  isActive('/admin/transform-locations') 
-                    ? 'border-blue-500 text-blue-600' 
-                    : 'border-transparent hover:border-blue-500'
+                className={`px-4 py-3 inline-block hover:bg-[#f0f5f2] border-b-2 ${
+                  isActive('/admin/transform-locations')
+                    ? 'border-[#8bac98] text-[#8bac98]' 
+                    : 'border-transparent hover:border-[#8bac98]'
                 } transition`}
               >
                 Fix Locations
+              </Link>
+            </li>
+            <li>
+              <Link 
+                href="/admin/settings" 
+                className={`px-4 py-3 inline-block hover:bg-[#f0f5f2] border-b-2 ${
+                  isActive('/admin/settings')
+                    ? 'border-[#8bac98] text-[#8bac98]' 
+                    : 'border-transparent hover:border-[#8bac98]'
+                } transition`}
+              >
+                Settings
               </Link>
             </li>
           </ul>

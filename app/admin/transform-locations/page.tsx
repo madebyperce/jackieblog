@@ -138,7 +138,7 @@ export default function TransformLocationsPage() {
           <button
             onClick={transformAllLocations}
             disabled={transforming || loading || photos.length === 0 || status !== 'authenticated'}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+            className="px-4 py-2 bg-[#8bac98] text-white rounded hover:bg-[#7a9a87] disabled:opacity-50"
           >
             {transforming ? 'Transforming...' : 'Transform All Locations'}
           </button>

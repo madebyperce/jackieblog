@@ -420,7 +420,7 @@ export default function AdminCommentsPage() {
                             </button>
                             <button
                               onClick={() => handleSaveEdit(comment._id)}
-                              className="text-blue-600 text-sm"
+                              className="text-[#8bac98] text-sm"
                               disabled={isSaving}
                             >
                               {isSaving ? 'Saving...' : 'Save'}
@@ -454,7 +454,7 @@ export default function AdminCommentsPage() {
                             <button
                               onClick={() => getPhotoId(comment) && handleViewPhotoClick(getPhotoId(comment)!)}
                               disabled={!getPhotoId(comment)}
-                              className="text-xs text-blue-500 hover:underline disabled:text-gray-400 disabled:no-underline"
+                              className="text-xs text-[#8bac98] hover:underline disabled:text-gray-400 disabled:no-underline"
                             >
                               {getPhotoId(comment) ? 'View Photo' : 'No Photo Link'}
                             </button>
@@ -468,7 +468,7 @@ export default function AdminCommentsPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       {!editingCommentId && (
                         <button 
-                          className="text-blue-600 hover:text-blue-900 mr-3"
+                          className="text-[#8bac98] hover:text-[#7a9a87] mr-3"
                           onClick={() => handleEditClick(comment)}
                         >
                           Edit
