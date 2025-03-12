@@ -3,12 +3,9 @@ import { getServerSession } from 'next-auth';
 import authOptions from '@/lib/auth';
 import cloudinary from '@/lib/cloudinary';
 import { UploadApiResponse, UploadApiErrorResponse } from 'cloudinary/types';
-import connectDB from '@/lib/mongodb';
-import Photo from '@/models/Photo';
-import Comment from '@/models/Comment';
-import { Readable } from 'stream';
-import { UploadStream } from 'cloudinary';
-import { promisify } from 'util';
+import { connectToDatabase, getCollectionName } from '../../lib/mongodb';
+import { NextRequest } from 'next/server';
+import { MongoClient } from 'mongodb';
 
 type CloudinaryResult = UploadApiResponse & {
   image_metadata?: {
@@ -65,48 +62,132 @@ function convertDMSToDecimal(dms: string, ref: string): number | undefined {
   return decimal;
 }
 
-export async function GET() {
+// Get MongoDB connection string from environment variable
+const uri = process.env.MONGODB_URI;
+
+// Check if the URI is defined
+if (!uri) {
+  throw new Error('Please add your MongoDB URI to .env.local');
+}
+
+export async function GET(request: Request) {
+  let client;
   try {
-    await connectDB();
-    // Make sure Comment model is loaded before using populate
-    await import('@/models/Comment');
-    const photos = (await Photo.find()
-      .populate('comments')
-      .sort({ capturedAt: -1 })
-      .lean()) as unknown as MongoPhoto[];
+    // Parse the URL to get query parameters
+    const url = new URL(request.url);
+    const includeComments = url.searchParams.get('includeComments') === 'true';
+    
+    console.log('GET /api/photos - includeComments:', includeComments);
+    
+    // Use the non-null assertion operator (!) to tell TypeScript that uri is definitely not undefined
+    // Or use type assertion to cast it to string
+    client = new MongoClient(uri as string);
+    await client.connect();
 
-    // Process photos to ensure dates are properly formatted
-    const processedPhotos = photos.map(photo => {
-      // Convert MongoDB document to a plain object
-      const photoObj = JSON.parse(JSON.stringify(photo));
+    // Use the correct database name from your environment variables
+    const dbName = process.env.MONGODB_DB || 'jackieblog';
+    const database = client.db(dbName);
+    
+    const photosCollection = database.collection('photos');
+    const commentsCollection = database.collection('comments');
+    
+    console.log('Using collections: photos and comments');
+    
+    // Fetch all photos
+    const photos = await photosCollection.find({}).toArray();
+    
+    console.log(`Found ${photos.length} photos in photos collection`);
+    
+    // If includeComments is true, fetch and attach comments to each photo
+    if (includeComments && photos.length > 0) {
+      console.log('Fetching comments for photos...');
       
-      // Ensure dates and location data are properly formatted
-      const processedPhoto = {
-        ...photoObj,
-        _id: photo._id.toString(),
-        capturedAt: photo.capturedAt ? new Date(photo.capturedAt).toISOString() : undefined,
-        createdAt: photo.createdAt ? new Date(photo.createdAt).toISOString() : new Date().toISOString(),
-        location: photo.location,
-        metadata: {
-          ...photo.metadata,
-          coordinates: photo.metadata?.latitude && photo.metadata?.longitude
-            ? `${photo.metadata.latitude},${photo.metadata.longitude}`
-            : null
-        },
-        comments: photo.comments?.map((comment: MongoComment) => ({
-          ...comment,
-          _id: comment._id.toString(),
-          createdAt: comment.createdAt ? new Date(comment.createdAt).toISOString() : new Date().toISOString()
-        })) || []
-      };
-
-      return processedPhoto;
-    });
-
-    return NextResponse.json(processedPhotos);
+      // Fetch all comments
+      const allComments = await commentsCollection.find({}).toArray();
+      console.log(`Found ${allComments.length} comments in comments collection`);
+      
+      // Create a map of photoId to comments
+      const commentsByPhotoId = new Map();
+      for (const comment of allComments) {
+        const photoId = comment.photoId?.toString();
+        if (photoId) {
+          if (!commentsByPhotoId.has(photoId)) {
+            commentsByPhotoId.set(photoId, []);
+          }
+          commentsByPhotoId.get(photoId).push({
+            _id: comment._id.toString(),
+            content: comment.content,
+            authorName: comment.authorName,
+            createdAt: comment.createdAt,
+            photoId: photoId
+          });
+        }
+      }
+      
+      // Process photos to ensure proper JSON serialization
+      const processedPhotos = photos.map(photo => {
+        // Create a new object with all properties
+        const processedPhoto: any = { 
+          ...photo,
+          _id: photo._id.toString()
+        };
+        
+        // Add comments if available
+        if (includeComments) {
+          processedPhoto.comments = commentsByPhotoId.get(processedPhoto._id) || [];
+        }
+        
+        // Convert dates to strings
+        if (processedPhoto.createdAt instanceof Date) {
+          processedPhoto.createdAt = processedPhoto.createdAt.toISOString();
+        }
+        if (processedPhoto.capturedAt instanceof Date) {
+          processedPhoto.capturedAt = processedPhoto.capturedAt.toISOString();
+        }
+        
+        return processedPhoto;
+      });
+      
+      console.log('Successfully processed photos');
+      
+      // Return the processed photos
+      return NextResponse.json(processedPhotos);
+    } else {
+      // Just convert ObjectIds to strings
+      const processedPhotos = photos.map(photo => {
+        // Create a new object with all properties
+        const processedPhoto: any = { 
+          ...photo,
+          _id: photo._id.toString()
+        };
+        
+        // Convert dates to strings
+        if (processedPhoto.createdAt instanceof Date) {
+          processedPhoto.createdAt = processedPhoto.createdAt.toISOString();
+        }
+        if (processedPhoto.capturedAt instanceof Date) {
+          processedPhoto.capturedAt = processedPhoto.capturedAt.toISOString();
+        }
+        
+        return processedPhoto;
+      });
+      
+      console.log('Successfully processed photos');
+      
+      // Return the processed photos
+      return NextResponse.json(processedPhotos);
+    }
+    
+    // Make sure we're returning an array directly
+    return NextResponse.json(photos);
   } catch (error) {
-    console.error('Error fetching photos:', error);
-    return NextResponse.json({ error: 'Error fetching photos' }, { status: 500 });
+    console.error('Database error:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch photos from database' },
+      { status: 500 }
+    );
+  } finally {
+    if (client) await client.close();
   }
 }
 
@@ -292,10 +373,12 @@ export async function POST(request: Request) {
       parsedDate = new Date(); // Use current date as fallback
     }
 
-    // Ensure MongoDB connection before saving
+    // Connect to MongoDB
+    let db;
     try {
       console.log('Connecting to MongoDB...');
-      await connectDB();
+      const dbConnection = await connectToDatabase();
+      db = dbConnection.db;
     } catch (dbError: any) {
       console.error('MongoDB connection error:', dbError);
       return NextResponse.json({ 
@@ -303,6 +386,9 @@ export async function POST(request: Request) {
         details: dbError.message 
       }, { status: 500 });
     }
+    
+    // When saving to database, use the appropriate collection name
+    const photosCollection = getCollectionName('photos');
     
     // Save to database with metadata if available
     let photo;
@@ -321,7 +407,7 @@ export async function POST(request: Request) {
         }
       };
 
-      console.log('Creating photo document:', {
+      console.log(`Creating photo document in ${photosCollection}:`, {
         hasImageUrl: !!photoData.imageUrl,
         metadata: photoData.metadata
       });
@@ -331,7 +417,9 @@ export async function POST(request: Request) {
         photoData.metadata.longitude = -photoData.metadata.longitude;
       }
 
-      photo = await Photo.create(photoData);
+      // Insert the photo directly using the MongoDB driver
+      const insertResult = await db.collection(photosCollection).insertOne(photoData);
+      photo = { _id: insertResult.insertedId, ...photoData };
       console.log('Photo document created:', { id: photo._id });
     } catch (saveError: any) {
       console.error('Error saving to database:', saveError);
@@ -343,9 +431,8 @@ export async function POST(request: Request) {
 
     // Convert MongoDB document to a plain object and handle dates
     try {
-      const photoObj = JSON.parse(JSON.stringify(photo));
       const response = {
-        ...photoObj,
+        ...photo,
         _id: photo._id.toString(),
         createdAt: photo.createdAt instanceof Date ? photo.createdAt.toISOString() : new Date().toISOString(),
         capturedAt: photo.capturedAt instanceof Date ? photo.capturedAt.toISOString() : parsedDate.toISOString()

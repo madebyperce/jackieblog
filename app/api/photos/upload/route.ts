@@ -1,94 +1,20 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import authOptions from '@/lib/auth';
-import connectDB from '@/lib/mongodb';
-import Photo from '@/models/Photo';
-import cloudinary from '@/lib/cloudinary';
 
-// Modern App Router configuration
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60; // Set an appropriate timeout for file uploads
+export const runtime = 'nodejs';
 
+// This endpoint is deprecated and will be removed in a future version
+// Please use /api/photos endpoint instead
 export async function POST(request: Request) {
-  try {
-    // Check authentication
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Parse the multipart form data
-    const formData = await request.formData();
-    const file = formData.get('file') as File;
-    const description = formData.get('description') as string;
-    const location = formData.get('location') as string;
-    const capturedAt = formData.get('capturedAt') as string;
-
-    if (!file) {
-      return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
-    }
-
-    // Convert file to buffer
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-
-    // Upload to Cloudinary
-    const uploadResponse = await new Promise<any>((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        { folder: 'jackie-blog' },
-        (error: any, result: any) => {
-          if (error) reject(error);
-          else resolve(result);
-        }
-      );
-
-      // Convert buffer to stream and pipe to uploadStream
-      const Readable = require('stream').Readable;
-      const readableStream = new Readable();
-      readableStream.push(buffer);
-      readableStream.push(null);
-      readableStream.pipe(uploadStream);
-    });
-
-    // Connect to database
-    await connectDB();
-
-    // Process coordinates to ensure western hemisphere locations have negative longitude
-    let photoMetadata = {};
-    if (uploadResponse.metadata && uploadResponse.metadata.gps) {
-      const { latitude, longitude } = uploadResponse.metadata.gps;
-      if (typeof latitude === 'number' && typeof longitude === 'number') {
-        // If it's likely a US location (latitude between 24-50) and longitude is positive
-        if (latitude >= 24 && latitude <= 50 && longitude > 0) {
-          photoMetadata = {
-            latitude,
-            longitude: -longitude // Apply negative transformation
-          };
-        } else {
-          photoMetadata = { latitude, longitude };
-        }
-      }
-    }
-
-    // Create new photo document
-    const newPhoto = new Photo({
-      imageUrl: uploadResponse.secure_url,
-      description,
-      location,
-      capturedAt: capturedAt || new Date().toISOString(),
-      metadata: photoMetadata,
-      authorId: session.user.id,
-      authorName: session.user.name,
-    });
-
-    await newPhoto.save();
-
-    return NextResponse.json(newPhoto);
-  } catch (error) {
-    console.error('Error uploading photo:', error);
-    return NextResponse.json(
-      { error: 'Error uploading photo' },
-      { status: 500 }
-    );
-  }
+  console.warn('DEPRECATED: /api/photos/upload endpoint is deprecated. Please use /api/photos endpoint instead.');
+  
+  // Create a new request to the main photos endpoint
+  const newRequest = new Request('/api/photos', {
+    method: 'POST',
+    headers: request.headers,
+    body: request.body
+  });
+  
+  // Forward the request to the main photos endpoint
+  return fetch(newRequest);
 } 

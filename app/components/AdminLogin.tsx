@@ -1,65 +1,112 @@
 'use client';
 
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useState, useEffect } from 'react';
 import { signIn, signOut, useSession } from 'next-auth/react';
-import { useRouter, usePathname } from 'next/navigation';
-
-interface LoginForm {
-  password: string;
-}
+import { useRouter } from 'next/navigation';
 
 export default function AdminLogin() {
-  const { data: session } = useSession();
-  const { register, handleSubmit, setError, formState: { errors } } = useForm<LoginForm>();
-  const [isLoading, setIsLoading] = useState(false);
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const pathname = usePathname();
-  const isAdminPage = pathname === '/admin';
+  const { status, data: session } = useSession();
+  
+  // Log session status for debugging
+  useEffect(() => {
+    console.log('AdminLogin: Current session status:', status, session);
+    
+    // Check for URL parameters that might indicate a redirect
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const authParam = urlParams.get('auth');
+      const logoutParam = urlParams.get('logout');
+      
+      console.log('URL parameters:', { auth: authParam, logout: logoutParam });
+    }
+  }, [status, session]);
 
-  const onSubmit = async (data: LoginForm) => {
-    setIsLoading(true);
+  // Function to handle logout
+  const handleLogout = async () => {
+    console.log('Logging out...');
     try {
-      const result = await signIn('credentials', {
-        password: data.password,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        setError('password', {
-          type: 'manual',
-          message: 'Invalid password',
+      await signOut({ redirect: false });
+      console.log('Logged out via signOut API');
+      
+      // Clear any local storage or cookies that might be persisting
+      if (typeof window !== 'undefined') {
+        localStorage.clear();
+        console.log('Cleared localStorage');
+        
+        // Clear cookies by setting them to expire
+        document.cookie.split(";").forEach(function(c) {
+          document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
         });
-      } else if (!isAdminPage) {
-        router.push('/admin');
-      } else {
-        router.refresh();
+        console.log('Attempted to clear cookies');
+        
+        // Force reload to ensure clean state
+        window.location.href = '/admin?logout=' + Date.now();
       }
     } catch (error) {
-      console.error('Login error:', error);
-      setError('password', {
-        type: 'manual',
-        message: 'An error occurred during login',
-      });
-    } finally {
-      setIsLoading(false);
+      console.error('Error during logout:', error);
     }
   };
 
-  if (session?.user) {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log('Login form submitted with password length:', password.length);
+    setError('');
+    setLoading(true);
+
+    try {
+      // Use a fixed admin email and the entered password
+      console.log('Attempting to sign in with credentials:', {
+        email: 'admin@example.com',
+        passwordProvided: !!password
+      });
+      
+      try {
+        const result = await signIn('credentials', {
+          redirect: false,
+          email: 'admin@example.com',
+          password,
+        });
+        console.log('Sign in result:', JSON.stringify(result));
+        
+        if (result?.error) {
+          console.error('Authentication error from NextAuth:', result.error);
+          setError('Invalid password');
+          setLoading(false);
+        } else if (result?.ok) {
+          console.log('Login successful, result.ok =', result.ok);
+          
+          // Force a full page reload to ensure the session is properly recognized
+          console.log('Redirecting to admin page with timestamp');
+          window.location.href = '/admin?auth=' + Date.now();
+        } else {
+          console.log('Unexpected result state:', result);
+          setError('Unexpected authentication response');
+          setLoading(false);
+        }
+      } catch (signInError) {
+        console.error('Error during signIn call:', signInError);
+        throw signInError;
+      }
+    } catch (error) {
+      console.error('Login error (outer catch):', error);
+      setError('An error occurred during login');
+      setLoading(false);
+    }
+  };
+
+  // If already authenticated, show logout option
+  if (status === 'authenticated' && session) {
+    console.log('Rendering authenticated view with logout button');
     return (
-      <div className="flex justify-between items-center bg-green-100 p-4 rounded-lg">
-        <span className="text-green-800">Logged in as admin</span>
+      <div className="text-center">
+        <p className="mb-4">You are already logged in as admin.</p>
         <button
-          onClick={async () => {
-            await signOut({ redirect: false });
-            if (isAdminPage) {
-              router.push('/');
-            } else {
-              router.refresh();
-            }
-          }}
-          className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition"
+          onClick={handleLogout}
+          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
         >
           Logout
         </button>
@@ -67,27 +114,40 @@ export default function AdminLogin() {
     );
   }
 
+  console.log('Rendering login form, status:', status);
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {error && (
+        <div className="p-2 bg-red-50 text-red-500 text-sm rounded">
+          {error}
+        </div>
+      )}
+      
       <div>
+        <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+          Admin Password
+        </label>
         <input
+          id="password"
           type="password"
-          {...register('password', { required: 'Password is required' })}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#8bac98] focus:border-[#8bac98]"
           placeholder="Enter admin password"
-          className="w-full p-2 border rounded"
-          autoComplete="current-password"
+          autoFocus
+          required
         />
-        {errors.password && (
-          <p className="text-red-500 text-sm mt-1">{errors.password.message}</p>
-        )}
       </div>
-      <button
-        type="submit"
-        disabled={isLoading}
-        className="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition disabled:opacity-50"
-      >
-        {isLoading ? 'Logging in...' : 'Login as Admin'}
-      </button>
+      
+      <div>
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#8bac98] hover:bg-[#7a9a87] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8bac98] disabled:opacity-50"
+        >
+          {loading ? 'Logging in...' : 'Login'}
+        </button>
+      </div>
     </form>
   );
 } 

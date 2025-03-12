@@ -1,3 +1,19 @@
+/**
+ * PhotoGrid Component
+ * 
+ * This component displays a grid of photos with comments functionality.
+ * It fetches photos directly from the API and provides a grid/thumbnail toggle view.
+ * 
+ * @deprecated Consider using the unified PhotoDisplay component instead,
+ * which combines functionality from both PhotoGrid and PhotoGallery.
+ * 
+ * Key features:
+ * - Self-fetching photos from API
+ * - Grid and thumbnail view modes
+ * - Comments functionality
+ * - Pagination
+ */
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -9,6 +25,9 @@ import { format } from 'date-fns';
 import CommentSection from './CommentSection';
 import Pagination from './Pagination';
 
+/**
+ * Photo interface representing the structure of a photo object
+ */
 interface Photo {
   _id: string;
   imageUrl: string;
@@ -30,6 +49,9 @@ interface Photo {
   }>;
 }
 
+/**
+ * Comment form data structure
+ */
 interface Comment {
   _id: string;
   content: string;
@@ -37,11 +59,19 @@ interface Comment {
   createdAt: string;
 }
 
+/**
+ * Comment form data structure
+ */
 interface CommentForm {
   content: string;
   authorName: string;
 }
 
+/**
+ * Formats a date string into a human-readable format
+ * @param dateString - ISO date string to format
+ * @returns Formatted date string
+ */
 function formatDate(dateString: string) {
   try {
     if (!dateString) {
@@ -72,6 +102,7 @@ function formatDate(dateString: string) {
 }
 
 export default function PhotoGrid() {
+  // State variables
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
@@ -81,22 +112,34 @@ export default function PhotoGrid() {
   const photosPerPage = 10;
   const { register, handleSubmit, reset } = useForm<CommentForm>();
 
-  // Preload thumbnails
+  /**
+   * Preloads image thumbnails for better user experience
+   */
   useEffect(() => {
-    photos.forEach(photo => {
-      const img = new window.Image();
-      img.src = photo.imageUrl;
-    });
+    if (Array.isArray(photos)) {
+      photos.forEach(photo => {
+        const img = new window.Image();
+        img.src = photo.imageUrl;
+      });
+    }
   }, [photos]);
 
-  // Function to find the page number for a specific photo
+  /**
+   * Finds the page number for a specific photo
+   * @param photoId - ID of the photo to find
+   * @returns Page number containing the photo
+   */
   const findPhotoPage = (photoId: string) => {
+    if (!Array.isArray(photos)) return 1;
     const photoIndex = photos.findIndex(p => p._id === photoId);
     if (photoIndex === -1) return 1;
     return Math.floor(photoIndex / photosPerPage) + 1;
   };
 
-  // Handle thumbnail click
+  /**
+   * Handles thumbnail click to navigate to the full photo view
+   * @param photoId - ID of the clicked photo
+   */
   const handleThumbnailClick = (photoId: string) => {
     const targetPage = findPhotoPage(photoId);
     setCurrentPage(targetPage);
@@ -110,10 +153,16 @@ export default function PhotoGrid() {
     }, 100);
   };
 
+  /**
+   * Fetches photos from the API on component mount
+   */
   useEffect(() => {
     fetchPhotos();
   }, []);
 
+  /**
+   * Fetches photos from the API
+   */
   const fetchPhotos = async () => {
     try {
       setIsLoading(true);
@@ -124,25 +173,37 @@ export default function PhotoGrid() {
         throw new Error(data.error || 'Failed to fetch photos');
       }
       
+      // Check if data is in the expected format
+      let photosArray = [];
+      
+      if (Array.isArray(data)) {
+        photosArray = data;
+      } else if (data && data.photos && Array.isArray(data.photos)) {
+        photosArray = data.photos;
+      } else {
+        console.error('Unexpected API response format:', data);
+        photosArray = [];
+      }
+      
       // Log detailed information about the first photo
-      if (data && data.length > 0) {
+      if (photosArray.length > 0) {
         console.log('First photo data:', {
-          _id: data[0]._id,
+          _id: photosArray[0]._id,
           dates: {
-            capturedAt: data[0].capturedAt,
-            createdAt: data[0].createdAt
+            capturedAt: photosArray[0].capturedAt,
+            createdAt: photosArray[0].createdAt
           },
           location: {
-            userProvided: data[0].location,
-            hasMetadata: Boolean(data[0].metadata),
-            coordinates: data[0].metadata?.coordinates,
-            latitude: data[0].metadata?.latitude,
-            longitude: data[0].metadata?.longitude
+            userProvided: photosArray[0].location,
+            hasMetadata: Boolean(photosArray[0].metadata),
+            coordinates: photosArray[0].metadata?.coordinates,
+            latitude: photosArray[0].metadata?.latitude,
+            longitude: photosArray[0].metadata?.longitude
           }
         });
       }
       
-      setPhotos(data || []);
+      setPhotos(photosArray);
       setError('');
     } catch (error) {
       console.error('Error fetching photos:', error);
@@ -152,6 +213,11 @@ export default function PhotoGrid() {
     }
   };
 
+  /**
+   * Submits a new comment for a photo
+   * @param photoId - ID of the photo to comment on
+   * @param data - Comment form data
+   */
   const onSubmitComment = async (photoId: string, data: CommentForm) => {
     try {
       const response = await fetch(`/api/photos/${photoId}/comments`, {
@@ -173,6 +239,10 @@ export default function PhotoGrid() {
     }
   };
 
+  /**
+   * Toggles the visibility of comments for a photo
+   * @param photoId - ID of the photo to toggle comments for
+   */
   const toggleComments = (photoId: string) => {
     setExpandedComments(prev => ({
       ...prev,
@@ -180,17 +250,27 @@ export default function PhotoGrid() {
     }));
   };
 
-  // Calculate pagination
+  // Get current photos for pagination
   const indexOfLastPhoto = currentPage * photosPerPage;
   const indexOfFirstPhoto = indexOfLastPhoto - photosPerPage;
-  const currentPhotos = photos.slice(indexOfFirstPhoto, indexOfLastPhoto);
-  const totalPages = Math.ceil(photos.length / photosPerPage);
+  // Ensure photos is an array before calling slice
+  const currentPhotos = Array.isArray(photos) 
+    ? photos.slice(indexOfFirstPhoto, indexOfLastPhoto)
+    : [];
+  // Fix the parentheses in the totalPages calculation
+  const totalPages = Math.ceil(Array.isArray(photos) ? photos.length / photosPerPage : 0);
 
+  /**
+   * Logs view mode changes (for debugging)
+   */
   useEffect(() => {
     console.log('View mode changed:', view);
   }, [view]);
 
-  // Add this function to handle page changes with scrolling
+  /**
+   * Handles page changes with smooth scrolling
+   * @param pageNumber - New page number
+   */
   const handlePageChange = (pageNumber: number) => {
     // Update the current page
     setCurrentPage(pageNumber);
@@ -224,7 +304,7 @@ export default function PhotoGrid() {
     return <div className="text-red-500 text-center">{error}</div>;
   }
 
-  if (photos.length === 0) {
+  if (!Array.isArray(photos) || photos.length === 0) {
     return <div className="text-gray-500 text-center">No photos yet</div>;
   }
 

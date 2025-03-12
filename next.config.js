@@ -10,6 +10,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'www.mapquestapi.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
     ],
   },
   webpack: (config) => {
