@@ -27,7 +27,8 @@ export const metadata: Metadata = {
   },
 };
 
-export const dynamic = 'force-dynamic';
+// Rename to avoid conflict with the imported dynamic function
+export const dynamicConfig = 'force-dynamic';
 export const maxDuration = 60; // Set an appropriate timeout for file uploads
 
 export default function RootLayout({
