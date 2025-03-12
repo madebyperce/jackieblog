@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -29,6 +29,13 @@ interface CommentSectionProps {
 }
 
 export default function CommentSection({ photo, onSubmitComment }: CommentSectionProps) {
+  console.log('CommentSection rendered with photo:', {
+    photoId: photo?._id, 
+    hasComments: !!photo?.comments,
+    commentCount: photo?.comments?.length || 0,
+    hasOnSubmitComment: !!onSubmitComment
+  });
+
   const [isExpanded, setIsExpanded] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { register, handleSubmit, reset, formState: { errors } } = useForm<CommentForm>();
@@ -36,6 +43,11 @@ export default function CommentSection({ photo, onSubmitComment }: CommentSectio
   // Ensure comments is always an array
   const comments = photo.comments || [];
   const commentCount = comments.length;
+
+  // Log whenever comments array changes
+  useEffect(() => {
+    console.log('Comments array updated:', comments);
+  }, [comments]);
 
   const triggerSparkle = (e: React.MouseEvent<HTMLButtonElement>) => {
     console.log('triggerSparkle called', e.currentTarget);
@@ -75,7 +87,8 @@ export default function CommentSection({ photo, onSubmitComment }: CommentSectio
   };
 
   const onSubmit = async (data: CommentForm) => {
-    console.log('Comment submission started', data);
+    const submissionId = Date.now().toString(); // Unique ID for tracking this submission
+    console.log(`[${submissionId}] Comment submission started:`, data);
     setIsSubmitting(true);
     
     try {
@@ -83,51 +96,83 @@ export default function CommentSection({ photo, onSubmitComment }: CommentSectio
       
       // If a custom submit handler is provided, use it
       if (onSubmitComment) {
-        console.log('Using custom submit handler');
-        await onSubmitComment(data);
+        console.log(`[${submissionId}] Using custom submit handler`);
+        try {
+          const result = await onSubmitComment(data);
+          console.log(`[${submissionId}] Custom submit handler completed:`, result);
+        } catch (customHandlerError) {
+          console.error(`[${submissionId}] Error in custom submit handler:`, customHandlerError);
+          throw customHandlerError; // Rethrow to be caught by the outer try/catch
+        }
         reset();
         // Don't return early, continue to trigger confetti
         shouldReloadPage = false; // Assume custom handler manages page state
       } else {
-        console.log('Using default submit handler');
+        console.log(`[${submissionId}] Using default submit handler`);
         // Otherwise use the default implementation
-        const response = await fetch(`/api/photos/${photo._id}/comments`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(data),
-        });
+        try {
+          const requestStartTime = Date.now();
+          console.log(`[${submissionId}] Sending POST request to /api/photos/${photo._id}/comments`);
+          
+          const response = await fetch(`/api/photos/${photo._id}/comments`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data),
+          });
 
-        console.log('API response:', {
-          status: response.status,
-          ok: response.ok
-        });
+          const requestDuration = Date.now() - requestStartTime;
+          console.log(`[${submissionId}] API response received in ${requestDuration}ms:`, {
+            status: response.status,
+            ok: response.ok,
+            statusText: response.statusText
+          });
 
-        if (!response.ok) {
-          throw new Error('Failed to post comment');
+          // Try to parse response body
+          let responseBody;
+          try {
+            responseBody = await response.json();
+            console.log(`[${submissionId}] Response body:`, responseBody);
+          } catch (parseError) {
+            console.warn(`[${submissionId}] Could not parse response as JSON:`, parseError);
+          }
+
+          if (!response.ok) {
+            console.error(`[${submissionId}] API request failed with status ${response.status}`);
+            throw new Error(`Failed to post comment: ${response.statusText}`);
+          }
+
+          console.log(`[${submissionId}] Comment successfully saved to database`);
+        } catch (apiError) {
+          console.error(`[${submissionId}] API request error:`, apiError);
+          throw apiError; // Rethrow to be caught by the outer try/catch
         }
 
         // Reset form
         reset();
       }
       
+      // Log current comments before adding new one
+      console.log(`[${submissionId}] Current comments before update:`, photo.comments || []);
+      
       // Trigger sparkle effect regardless of which handler was used
-      console.log('Looking for submit button to trigger sparkle');
+      console.log(`[${submissionId}] Looking for submit button to trigger sparkle`);
       const submitButton = document.querySelector('button[type="submit"]');
-      console.log('Submit button found:', submitButton);
+      console.log(`[${submissionId}] Submit button found:`, submitButton);
       
       if (submitButton) {
-        console.log('Attempting to trigger sparkle effect');
+        console.log(`[${submissionId}] Attempting to trigger sparkle effect`);
         // Add a small delay to ensure DOM has updated
         setTimeout(() => {
           try {
             triggerSparkle({ currentTarget: submitButton } as React.MouseEvent<HTMLButtonElement>);
+            console.log(`[${submissionId}] Sparkle effect triggered successfully`);
           } catch (error) {
-            console.error('Error in triggerSparkle:', error);
+            console.error(`[${submissionId}] Error in triggerSparkle:`, error);
             
             // Fallback: try direct confetti call
-            console.log('Trying direct confetti call as fallback');
+            console.log(`[${submissionId}] Trying direct confetti call as fallback`);
             try {
               confetti({
                 particleCount: 50,
@@ -139,9 +184,9 @@ export default function CommentSection({ photo, onSubmitComment }: CommentSectio
                 shapes: ['star'],
                 ticks: 100
               });
-              console.log('Direct confetti call successful');
+              console.log(`[${submissionId}] Direct confetti call successful`);
             } catch (confettiError) {
-              console.error('Error in direct confetti call:', confettiError);
+              console.error(`[${submissionId}] Error in direct confetti call:`, confettiError);
             }
           }
         }, 100);
@@ -149,23 +194,32 @@ export default function CommentSection({ photo, onSubmitComment }: CommentSectio
         // Only reload the page if using the default handler
         if (shouldReloadPage) {
           // Add a delay before reloading the page to allow confetti to render
-          console.log('Delaying page reload to allow confetti to render');
+          console.log(`[${submissionId}] Delaying page reload to allow confetti to render`);
           setTimeout(() => {
-            console.log('Reloading page');
+            console.log(`[${submissionId}] Reloading page`);
             window.location.reload();
           }, 1000); // 1 second delay
+        } else {
+          console.log(`[${submissionId}] No page reload (using custom handler)`);
+          
+          // If not reloading, let's add a console log after a delay to check if comments updated
+          setTimeout(() => {
+            console.log(`[${submissionId}] Checking comments after 3 seconds:`, photo.comments || []);
+          }, 3000);
         }
       } else {
-        console.log('Submit button not found');
+        console.log(`[${submissionId}] Submit button not found`);
         // Only reload if using default handler and button not found
         if (shouldReloadPage) {
+          console.log(`[${submissionId}] Reloading page without sparkle effect`);
           window.location.reload();
         }
       }
     } catch (error) {
-      console.error('Error posting comment:', error);
+      console.error(`[${submissionId}] Error posting comment:`, error);
     } finally {
       setIsSubmitting(false);
+      console.log(`[${submissionId}] Comment submission process completed`);
     }
   };
 
